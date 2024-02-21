@@ -179,12 +179,13 @@ const navigateToContainer = () => {
 };
 </script>
 
-<div class="m-4 w-full flew flex-col">
+<div class="m-4 w-full flex flex-col">
   {#if error}
     <div class="mb-2">
       <ErrorMessage error="{error}" />
     </div>
   {/if}
+
   <Card classes="bg-charcoal-800">
     <div slot="content" class="my-2 mx-4 w-full text-base font-normal flex flex-row items-center">
       {#key playgroundState?.status}
@@ -196,32 +197,40 @@ const navigateToContainer = () => {
       {/key}
     </div>
   </Card>
-  <div class="mb-2">Prompt</div>
-  <textarea
-    aria-label="prompt"
-    bind:value="{prompt}"
-    rows="4"
-    class="w-full p-2 outline-none text-sm bg-charcoal-800 rounded-sm text-gray-700 placeholder-gray-700"
-    placeholder="Type your prompt here"></textarea>
 
-  <div class="mt-4 text-right">
-    {#key playgroundState?.status}
-      <Button disabled="{!isPromptable()}" inProgress="{inProgress}" on:click="{() => askPlayground()}"
-        >Send Request</Button>
-    {/key}
+  <div class="flex-grow">
+    {#if result}
+      <div class="p-2 w-full text-base font-normal flex flex-row items-center">
+        <span class="flex-grow">Output</span>
+        <span class="text-right" aria-label="elapsed">{elapsed.toFixed(1)} s</span>
+      </div>
+      <textarea
+        aria-label="response"
+        readonly
+        disabled
+        rows="20"
+        bind:value="{result}"
+        class="w-full p-2 outline-none text-sm bg-charcoal-800 rounded-sm text-gray-700 placeholder-gray-700"></textarea>
+    {/if}
   </div>
 
-  {#if result}
-    <div class="p-2 w-full text-base font-normal flex flex-row items-center">
-      <span class="flex-grow">Output</span>
-      <span class="text-right" aria-label="elapsed">{elapsed.toFixed(1)} s</span>
-    </div>
+
+  <Card classes="bg-charcoal-800">
+    <div slot="content">
     <textarea
-      aria-label="response"
-      readonly
-      disabled
-      rows="20"
-      bind:value="{result}"
-      class="w-full p-2 outline-none text-sm bg-charcoal-800 rounded-sm text-gray-700 placeholder-gray-700"></textarea>
-  {/if}
+      aria-label="prompt"
+      bind:value="{prompt}"
+      rows="4"
+      class="w-full p-2 outline-none text-sm  text-gray-700 placeholder-gray-700"
+      placeholder="Type your prompt here"></textarea>
+      <div class="mt-4 text-right">
+        {#key playgroundState?.status}
+          <Button disabled="{!isPromptable()}" inProgress="{inProgress}" on:click="{() => askPlayground()}"
+          >Send Request</Button>
+        {/key}
+      </div>
+    </div>
+  </Card>
+
+
 </div>

@@ -18,8 +18,8 @@
 
 import { beforeEach, afterEach, expect, test, vi } from 'vitest';
 import { LABEL_MODEL_ID, LABEL_MODEL_PORT, PlayGroundManager } from './playground';
-import type { PodmanConnection, machineStopHandle, startupHandle } from './podmanConnection';
-import type { ContainerRegistry } from '../registries/ContainerRegistry';
+import type { PodmanConnection, machineStopHandle, startupHandle } from '../podmanConnection';
+import type { ContainerRegistry } from '../../registries/ContainerRegistry';
 import type { ImageInfo, TelemetryLogger, Webview } from '@podman-desktop/api';
 
 const mocks = vi.hoisted(() => ({

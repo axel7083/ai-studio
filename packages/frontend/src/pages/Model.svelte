@@ -5,6 +5,7 @@ import Route from '/@/Route.svelte';
 import MarkdownRenderer from '/@/lib/markdown/MarkdownRenderer.svelte';
 import ModelPlayground from './ModelPlayground.svelte';
 import { catalog } from '/@/stores/catalog';
+import OpenAISwagger from '/@/lib/OpenAISwagger.svelte';
 
 export let modelId: string;
 
@@ -25,7 +26,10 @@ $: model = $catalog.models.find(m => m.id === modelId);
       </div>
     </Route>
     <Route path="/playground" breadcrumb="Playground">
-      <ModelPlayground model="{model}" />
+      <div class="w-full overflow-y-hidden grid grid-cols-2">
+        <ModelPlayground model="{model}" />
+        <OpenAISwagger/>
+      </div>
     </Route>
   </svelte:fragment>
 </NavPage>

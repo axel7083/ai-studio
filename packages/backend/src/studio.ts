@@ -29,7 +29,7 @@ import { StudioApiImpl } from './studio-api-impl';
 import { ApplicationManager } from './managers/applicationManager';
 import { GitManager } from './managers/gitManager';
 import { TaskRegistry } from './registries/TaskRegistry';
-import { PlayGroundManager } from './managers/playground';
+import { PlayGroundManager } from './managers/playground/playground';
 import { CatalogManager } from './managers/catalogManager';
 import { ModelsManager } from './managers/modelsManager';
 import path from 'node:path';

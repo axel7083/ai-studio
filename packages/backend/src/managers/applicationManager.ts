@@ -37,7 +37,7 @@ import { getPortsInfo } from '../utils/ports';
 import { goarch } from '../utils/arch';
 import { getDurationSecondsSince, timeout } from '../utils/utils';
 import type { LocalRepositoryRegistry } from '../registries/LocalRepositoryRegistry';
-import { LABEL_MODEL_ID } from './playground';
+import { LABEL_MODEL_ID } from './playground/playground';
 import type { EnvironmentState } from '@shared/src/models/IEnvironmentState';
 import type { PodmanConnection } from './podmanConnection';
 import { MSG_ENVIRONMENTS_STATE_UPDATE } from '@shared/Messages';
