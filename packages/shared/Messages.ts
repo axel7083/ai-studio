@@ -25,3 +25,5 @@ export const MSG_NEW_MODELS_STATE = 'new-models-state';
 export const MSG_ENVIRONMENTS_STATE_UPDATE = 'environments-state-update';
 export const MSG_LOCAL_REPOSITORY_UPDATE = 'local-repository-update';
 
+export const MSG_INFERENCE_SERVERS_UPDATE = 'inference-servers-update';
+

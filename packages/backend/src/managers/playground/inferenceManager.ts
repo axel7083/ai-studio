@@ -15,122 +15,116 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import { InferenceServer } from '@shared/src/models/IInference';
+import type { InferenceServer } from '@shared/src/models/IInference';
 import type { PodmanConnection } from '../podmanConnection';
 import {
   containerEngine,
-  ImageInfo,
-  provider,
-  type ProviderContainerConnection,
-  type TelemetryLogger,
+  type TelemetryLogger, type Webview,
 } from '@podman-desktop/api';
-import { getFreePort } from '../../utils/ports';
-import path from 'node:path';
-import { LABEL_MODEL_ID, LABEL_MODEL_PORT } from './playground';
 import type { ContainerRegistry } from '../../registries/ContainerRegistry';
+import { GenerateContainerCreateOptions } from '../../utils/inferenceUtils';
+import { Publisher } from '../../utils/Publisher';
+import { MSG_INFERENCE_SERVERS_UPDATE } from '@shared/Messages';
+import type { InferenceServerConfig } from '../../models/InferenceServerConfig';
 
-/**
- * Return the first started podman container connection provider
- */
-function getPodmanContainerConnection(): ProviderContainerConnection {
-  const engine = provider
-    .getContainerConnections()
-    .filter(connection => connection.connection.type === 'podman')
-    .find(connection => connection.connection.status() === 'started');
-  if(engine === undefined)
-    throw new Error('cannot find any started podman container provider.')
-  return engine;
-}
-
-/**
- * Given an image name, it will return the ImageInfo corresponding. Will raise an error if not found.
- * @param image
- */
-async function getImageInfo(image: string): Promise<ImageInfo> {
-  const imageInfo = (await containerEngine.listImages()).find(im => im.RepoTags?.some(tag => tag === image));
-  if(imageInfo === undefined)
-    throw new Error(`image ${image} not found.`);
-  return imageInfo;
-}
-
-const PLAYGROUND_IMAGE = 'quay.io/bootsy/playground:v0';
-
-export class InferenceManager {
-  #server: InferenceServer | undefined = undefined;
+export class InferenceManager extends Publisher<InferenceServer[]>{
+  // List of inference servers
+  #servers: InferenceServer[];
+  // Is initialized
   #initialized: boolean = false;
 
-  constructor(private containerRegistry: ContainerRegistry, private podmanConnection: PodmanConnection, private telemetry: TelemetryLogger) {}
+  constructor(webview: Webview, private containerRegistry: ContainerRegistry, private podmanConnection: PodmanConnection, private telemetry: TelemetryLogger) {
+    super(webview, MSG_INFERENCE_SERVERS_UPDATE, () => this.getServers());
+    this.#servers = [];
+  }
 
   init(): void {
     // TODO: define listeners
-
     this.#initialized = true;
   }
 
-  async startInferenceServer(): Promise<void> {
-    if(!this.#initialized || this.#server !== undefined)
-      throw new Error('Cannot start the inference server.');
+  /**
+   * Get the Inference servers
+   */
+  public getServers(): InferenceServer[] {
+    return this.#servers;
+  }
 
-    const connection = getPodmanContainerConnection();
+  /**
+   * Given an engineId, it will start an inference server.
+   * @param config
+   */
+  async startInferenceServer(config: InferenceServerConfig): Promise<void> {
+    if(!this.#initialized)
+      throw new Error('Cannot start the inference server: not initialized.');
 
-    let image: ImageInfo;
-    try {
-      image = await getImageInfo(PLAYGROUND_IMAGE);
-    } catch (err: unknown) {
-      await containerEngine.pullImage(connection.connection, PLAYGROUND_IMAGE, () => {});
-      image = await getImageInfo(PLAYGROUND_IMAGE);
-    }
+    const result = await containerEngine.createContainer(config.image.engineId, GenerateContainerCreateOptions(config));
 
-    const freePort = await getFreePort();
-    const result = await containerEngine.createContainer(image.engineId, {
-      Image: image.Id,
-      Detach: true,
-      ExposedPorts: { ['' + freePort]: {} },
-      HostConfig: {
-        AutoRemove: true,
-        PortBindings: {
-          '8000/tcp': [
-            {
-              HostPort: '' + freePort,
-            },
-          ],
-        },
-      },
-      Labels: {
-        [LABEL_MODEL_PORT]: `${freePort}`,
-      },
-      Cmd: ['--models-path', '/models', '--context-size', '700', '--threads', '4'],
-    });
+    // Watch for container changes
+    this.watchContainerStatus(result.id);
 
-    this.#server = {
+    // Adding a new inference server
+    this.#servers.push({
       container: {
         containerId: result.id,
-        port: freePort,
-        engineId: image.engineId,
+        port: config.port,
+        engineId: config.image.engineId,
       },
       status: 'running',
       models: [],
       ready: false,
-    }
+    });
+    this.notify();
   }
 
-  private watchContainer(containerId: string): void {
+  /**
+   * Watch for container status changes
+   * @param containerId the container to watch out
+   */
+  private watchContainerStatus(containerId: string): void {
     const disposable = this.containerRegistry.subscribe(containerId, (status: string) => {
       switch (status) {
         case 'remove':
         case 'die':
         case 'cleanup':
-          this.#server = undefined;
+          // Update the list of servers
+          this.removeInferenceServer(containerId);
           disposable.dispose();
           break;
       }
     });
   }
 
-  async stopInferenceServer(): Promise<void> {
-    if(!this.#initialized || this.#server === undefined)
+  /**
+   * Remove the InferenceServer instance from #servers using the containerId
+   * @param containerId the id of the container running the Inference Server
+   */
+  private removeInferenceServer(containerId: string): void {
+    this.#servers = this.#servers.filter(server => server.container.containerId !== containerId);
+    this.notify();
+  }
+
+  /**
+   * Stop an inference server from the container id
+   * @param containerId the identifier of the container to stop
+   */
+  async stopInferenceServer(containerId?: string): Promise<void> {
+    if(!this.#initialized)
       throw new Error('Cannot stop the inference server.');
 
+    const server = this.#servers.find(server => server.container.containerId === containerId);
+    if(server === undefined)
+      throw new Error(`cannot find a corresponding server for container id ${containerId}.`);
 
+    try {
+      await containerEngine.stopContainer(server.container.engineId, server.container.containerId);
+      this.removeInferenceServer(containerId);
+    } catch (error: unknown) {
+      console.error(error);
+      this.telemetry.logError('inference.stop', {
+        message: 'error stopping inference',
+        error: error,
+      });
+    }
   }
 }
