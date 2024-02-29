@@ -23,7 +23,7 @@ import content from './ai-test.json';
 import userContent from './ai-user-test.json';
 import type { ApplicationManager } from './managers/applicationManager';
 import { StudioApiImpl } from './studio-api-impl';
-import type { PlayGroundManager } from './managers/playground';
+import type { PlayGroundManager } from './managers/playground/playground';
 import type { TelemetryLogger, Webview } from '@podman-desktop/api';
 import { CatalogManager } from './managers/catalogManager';
 import type { ModelsManager } from './managers/modelsManager';

@@ -19,7 +19,7 @@
 import type { StudioAPI } from '@shared/src/StudioAPI';
 import type { ApplicationManager } from './managers/applicationManager';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
-import type { PlayGroundManager } from './managers/playground';
+import type { PlayGroundManager } from './managers/playground/playground';
 import * as podmanDesktopApi from '@podman-desktop/api';
 import type { QueryState } from '@shared/src/models/IPlaygroundQueryState';
 
