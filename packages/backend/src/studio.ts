@@ -38,6 +38,7 @@ import fs from 'node:fs';
 import { ContainerRegistry } from './registries/ContainerRegistry';
 import { PodmanConnection } from './managers/podmanConnection';
 import { LocalRepositoryRegistry } from './registries/LocalRepositoryRegistry';
+import { InferenceManager } from './managers/playground/inferenceManager';
 
 // TODO: Need to be configured
 export const AI_STUDIO_FOLDER = path.join('podman-desktop', 'ai-studio');
@@ -53,6 +54,8 @@ export class Studio {
   catalogManager: CatalogManager;
   modelsManager: ModelsManager;
   telemetry: TelemetryLogger;
+
+  #inferenceManager: InferenceManager;
 
   constructor(readonly extensionContext: ExtensionContext) {
     this.#extensionContext = extensionContext;
@@ -147,6 +150,16 @@ export class Studio {
       localRepositoryRegistry,
     );
 
+    this.#inferenceManager = new InferenceManager(
+      this.#panel.webview,
+      containerRegistry,
+      podmanConnection,
+      this.telemetry,
+    );
+
+    // TODO: init lazily (only when the webview open)
+    this.#inferenceManager.init();
+
     this.#panel.onDidChangeViewState((e: WebviewPanelOnDidChangeViewStateEvent) => {
       this.telemetry.logUsage(e.webviewPanel.visible ? 'opened' : 'closed');
     });
@@ -160,6 +173,7 @@ export class Studio {
       this.telemetry,
       localRepositoryRegistry,
       taskRegistry,
+      this.#inferenceManager,
     );
 
     await this.catalogManager.loadCatalog();

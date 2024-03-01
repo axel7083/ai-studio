@@ -10,9 +10,11 @@ export interface InferenceServer {
    */
   container: {
     containerId: string;
-    port: number;
     engineId: string;
   };
+  connection: {
+    port: number,
+  },
   /**
    * Inference server status
    */

@@ -18,36 +18,56 @@
 import type { InferenceServer } from '@shared/src/models/IInference';
 import type { PodmanConnection } from '../podmanConnection';
 import {
-  containerEngine,
+  containerEngine, ContainerInfo, Disposable,
   type TelemetryLogger, type Webview,
 } from '@podman-desktop/api';
 import type { ContainerRegistry } from '../../registries/ContainerRegistry';
-import { GenerateContainerCreateOptions } from '../../utils/inferenceUtils';
+import { GenerateContainerCreateOptions, LABEL_INFERENCE_SERVER } from '../../utils/inferenceUtils';
 import { Publisher } from '../../utils/Publisher';
 import { MSG_INFERENCE_SERVERS_UPDATE } from '@shared/Messages';
-import type { InferenceServerConfig } from '../../models/InferenceServerConfig';
+import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 
-export class InferenceManager extends Publisher<InferenceServer[]>{
-  // List of inference servers
-  #servers: InferenceServer[];
+export class InferenceManager extends Publisher<InferenceServer[]> {
+  // Inference server map (containerId -> InferenceServer)
+  #servers: Map<string, InferenceServer>;
   // Is initialized
-  #initialized: boolean = false;
+  #initialized: boolean;
+  // Disposables
+  #disposables: Disposable[];
 
-  constructor(webview: Webview, private containerRegistry: ContainerRegistry, private podmanConnection: PodmanConnection, private telemetry: TelemetryLogger) {
+  constructor(
+    webview: Webview,
+    private containerRegistry: ContainerRegistry,
+    private podmanConnection: PodmanConnection,
+    private telemetry: TelemetryLogger
+  ) {
     super(webview, MSG_INFERENCE_SERVERS_UPDATE, () => this.getServers());
-    this.#servers = [];
+    this.#servers = new Map<string, InferenceServer>();
+    this.#disposables = [];
+    this.#initialized = false;
   }
 
-  init(): void {
-    // TODO: define listeners
-    this.#initialized = true;
+  init(): Disposable {
+    this.podmanConnection.onMachineStart(this.watchMachineEvent.bind(this, ['start']));
+    this.podmanConnection.onMachineStop(this.watchMachineEvent.bind(this, ['stop']));
+
+    this.retryableRefresh(3);
+
+    return Disposable.from(this.cleanDisposables.bind(this));
+  }
+
+  /**
+   * Clean class disposables
+   */
+  private cleanDisposables(): void {
+    this.#disposables.forEach(disposable => disposable.dispose());
   }
 
   /**
    * Get the Inference servers
    */
   public getServers(): InferenceServer[] {
-    return this.#servers;
+    return Array.from(this.#servers.values());
   }
 
   /**
@@ -58,30 +78,62 @@ export class InferenceManager extends Publisher<InferenceServer[]>{
     if(!this.#initialized)
       throw new Error('Cannot start the inference server: not initialized.');
 
+    // Create container on requested engine
     const result = await containerEngine.createContainer(config.image.engineId, GenerateContainerCreateOptions(config));
 
-    // Watch for container changes
-    this.watchContainerStatus(result.id);
-
     // Adding a new inference server
-    this.#servers.push({
+    this.#servers.set(result.id, {
       container: {
         containerId: result.id,
-        port: config.port,
         engineId: config.image.engineId,
+      },
+      connection: {
+        port: config.port,
       },
       status: 'running',
       models: [],
       ready: false,
     });
+
+    // Watch for container changes
+    this.watchContainerStatus(config.image.engineId, result.id);
+
     this.notify();
   }
 
   /**
    * Watch for container status changes
+   * @param engineId
    * @param containerId the container to watch out
    */
-  private watchContainerStatus(containerId: string): void {
+  private watchContainerStatus(engineId: string, containerId: string): void {
+    // Create a pulling update for container health check
+    const intervalId = setInterval(() => {
+      // Inspect container
+      containerEngine.inspectContainer(engineId, containerId).then(result => {
+        const server = this.#servers.get(containerId);
+        if(server === undefined)
+          throw new Error('Something went wrong while trying to get container status got undefined Inference Server.');
+
+        console.log(`container ${containerId} state`, result.State);
+        // Update server
+        this.#servers.set(containerId, {
+          ...server,
+          status: (result.State.Status === 'running')?'running':'stopped',
+          ready: result.State.Health.Status === 'healthy', // TODO: ensure Status string
+        });
+      }).catch((err: unknown) => {
+        // Ensure interval is cleared
+        clearInterval(intervalId);
+        console.error(`Something went wrong while trying to inspect container ${containerId}. Trying to refresh servers.`, err);
+        this.retryableRefresh(2);
+      });
+    }, 10000);
+
+    this.#disposables.push(Disposable.create(() => {
+      clearInterval(intervalId);
+    }));
+    // Subscribe to container status update
     const disposable = this.containerRegistry.subscribe(containerId, (status: string) => {
       switch (status) {
         case 'remove':
@@ -90,9 +142,76 @@ export class InferenceManager extends Publisher<InferenceServer[]>{
           // Update the list of servers
           this.removeInferenceServer(containerId);
           disposable.dispose();
+          clearInterval(intervalId);
           break;
       }
     });
+    // Allowing cleanup if extension is stopped
+    this.#disposables.push(disposable);
+  }
+
+  private watchMachineEvent(event: 'start' | 'stop'): void {
+    this.retryableRefresh(2);
+  }
+
+  /**
+   * This non-async utility method is made to retry refreshing the inference server with some delay
+   * in case of error raised.
+   *
+   * @param retry the number of retry allowed
+   */
+  private retryableRefresh(retry: number = 3): void {
+    if(retry === 0) {
+      console.error('Cannot refresh inference servers: retry limit has been reached. Cleaning manager.');
+      this.cleanDisposables();
+      this.#servers.clear();
+      this.#initialized = false;
+      return;
+    }
+    this.refreshInferenceServers().catch((err: unknown): void => {
+      console.warn(`Something went wrong while trying to refresh inference server. (retry left ${retry})`, err);
+      setTimeout(() => {
+        this.retryableRefresh(retry - 1);
+      }, 2000 + Math.random() * 1000);
+    });
+  }
+
+  /**
+   * Refresh the inference servers by listing all containers.
+   *
+   * This method has an important impact as it (re-)create all inference servers
+   */
+  private async refreshInferenceServers(): Promise<void> {
+    const containers: ContainerInfo[] = await containerEngine.listContainers();
+    const filtered = containers.filter(
+      c => c.Labels && LABEL_INFERENCE_SERVER in c.Labels,
+    );
+    // clean existing disposables
+    this.cleanDisposables();
+    this.#servers = new Map<string, InferenceServer>(filtered.map(containerInfo => [
+      containerInfo.Id,
+      {
+        container: {
+          containerId: containerInfo.Id,
+          engineId: containerInfo.engineId,
+        },
+        connection: {
+          port: (containerInfo.Ports.length > 0)?containerInfo.Ports[0].PublicPort:-1,
+        },
+        ready: false,
+        status: (containerInfo.Status === 'running')?'running':'stopped',
+        models: [], // Will be fetched later through the API
+      }
+    ]));
+
+    // (re-)create container watchers
+    this.#servers.forEach(server => this.watchContainerStatus(
+      server.container.engineId,
+      server.container.containerId
+    ));
+    this.#initialized = true;
+    // notify update
+    this.notify();
   }
 
   /**
@@ -100,7 +219,7 @@ export class InferenceManager extends Publisher<InferenceServer[]>{
    * @param containerId the id of the container running the Inference Server
    */
   private removeInferenceServer(containerId: string): void {
-    this.#servers = this.#servers.filter(server => server.container.containerId !== containerId);
+    this.#servers.delete(containerId);
     this.notify();
   }
 
@@ -112,7 +231,7 @@ export class InferenceManager extends Publisher<InferenceServer[]>{
     if(!this.#initialized)
       throw new Error('Cannot stop the inference server.');
 
-    const server = this.#servers.find(server => server.container.containerId === containerId);
+    const server = this.#servers.get(containerId);
     if(server === undefined)
       throw new Error(`cannot find a corresponding server for container id ${containerId}.`);
 

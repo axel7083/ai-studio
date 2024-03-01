@@ -20,10 +20,12 @@ import type { ModelInfo } from './models/IModelInfo';
 import type { QueryState } from './models/IPlaygroundQueryState';
 import type { Catalog } from './models/ICatalog';
 import type { PlaygroundState } from './models/IPlaygroundState';
-import type { TelemetryTrustedValue } from '@podman-desktop/api';
+import type { TelemetryTrustedValue, ImageInfo } from '@podman-desktop/api';
 import type { EnvironmentState } from './models/IEnvironmentState';
 import type { Task } from './models/ITask';
 import type { LocalRepository } from './models/ILocalRepository';
+import type { InferenceServer } from './models/IInference';
+import type { InferenceServerConfig } from './models/InferenceServerConfig';
 
 export abstract class StudioAPI {
   abstract ping(): Promise<string>;
@@ -71,4 +73,27 @@ export abstract class StudioAPI {
    * @param modelId the id of the model we want to download
    */
   abstract downloadModel(modelId: string): Promise<void>;
+
+  /**
+   * Get image info
+   * @param image the name of the image
+   */
+  abstract getImageInfo(image: string): Promise<ImageInfo>;
+
+  /**
+   * Get inference servers
+   */
+  abstract getInferenceServer(): Promise<InferenceServer[]>;
+
+  /**
+   * Start an inference server
+   * @param config The configuration to use
+   */
+  abstract startInferenceServer(config: InferenceServerConfig): Promise<void>;
+
+  /**
+   * Stop an inference server
+   * @param containerId the container id of the inference server
+   */
+  abstract stopInferenceServer(containerId: string): Promise<void>;
 }

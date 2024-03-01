@@ -21,9 +21,9 @@ import {
   type ImageInfo,
   type ProviderContainerConnection, ContainerCreateOptions,
 } from '@podman-desktop/api';
-import path from 'node:path';
-import { LABEL_MODEL_ID, LABEL_MODEL_PORT } from '../managers/playground/playground';
-import { InferenceServerConfig } from '../models/InferenceServerConfig';
+import { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
+
+export const LABEL_INFERENCE_SERVER: string = 'ai-studio-inference-server';
 
 /**
  * Return container connection provider
@@ -59,8 +59,10 @@ export function getContainerConnection(engineId?: string): ProviderContainerConn
  * @param engineId
  */
 export async function getImageInfo(image: string, engineId: string): Promise<ImageInfo> {
+  console.log(`get image ${image} with engineId ${engineId}.`);
   // Get all images available
   const images = await containerEngine.listImages();
+  console.log('all images', JSON.stringify(images));
   // Filter on engineId
   const imageInfo = images.find(im => im.engineId === engineId && im.RepoTags?.some(tag => tag === image));
   // Throw error if not found.
@@ -91,7 +93,10 @@ export function GenerateContainerCreateOptions(config: InferenceServerConfig): C
         ],
       },
     },
-    Labels: config.labels,
+    Labels: {
+      ...config.labels,
+      LABEL_INFERENCE_SERVER: 'true',
+    },
     Env: [`MODEL_PATH=/models/${config.models}`],
     Cmd: ['--models-path', '/models', '--context-size', '700', '--threads', '4'],
   };

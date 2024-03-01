@@ -25,6 +25,7 @@ const podmanDesktopApi = acquirePodmanDesktopApi();
 export const rpcBrowser: RpcBrowser = new RpcBrowser(window, podmanDesktopApi);
 
 export const studioClient: StudioAPI = rpcBrowser.getProxy<StudioAPI>();
+(window as any).studioClient = studioClient;
 
 export const saveRouterState = (state: RouterState) => {
   podmanDesktopApi.setState(state);
