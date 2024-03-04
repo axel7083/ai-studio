@@ -20,9 +20,18 @@ export interface InferenceServer {
    */
   status: 'stopped' | 'running',
   /**
-   * From the readiness / liveliness return
+   * Health check
    */
-  ready: boolean; // health check
+  health?: {
+    Status: string;
+    FailingStreak: number;
+    Log: Array<{
+      Start: string;
+      End: string;
+      ExitCode: number;
+      Output: string;
+    }>;
+  };
   /**
    * Exit code
    */

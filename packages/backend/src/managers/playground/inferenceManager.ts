@@ -25,7 +25,7 @@ import {
   PullEvent,
   type TelemetryLogger, type Webview,
 } from '@podman-desktop/api';
-import type { ContainerRegistry } from '../../registries/ContainerRegistry';
+import { ContainerRegistry, ContainerStart } from '../../registries/ContainerRegistry';
 import {
   GenerateContainerCreateOptions,
   getImageInfo, getProviderContainerConnection,
@@ -58,10 +58,14 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
   init(): Disposable {
     this.podmanConnection.onMachineStart(this.watchMachineEvent.bind(this, ['start']));
     this.podmanConnection.onMachineStop(this.watchMachineEvent.bind(this, ['stop']));
+    const onStartContainerEventDisposable = this.containerRegistry.onStartContainerEvent(this.watchContainerStart.bind(this));
 
     this.retryableRefresh(3);
 
-    return Disposable.from(this.cleanDisposables.bind(this));
+    return Disposable.from(
+      onStartContainerEventDisposable,
+      this.cleanDisposables.bind(this)
+    );
   }
 
   /**
@@ -133,7 +137,6 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
       },
       status: 'running',
       models: config.modelsInfo,
-      ready: false,
     });
 
     // Watch for container changes
@@ -148,36 +151,48 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
   }
 
   /**
+   * Given an engineId and a containerId, inspect the container and update the servers
+   * @param engineId
+   * @param containerId
+   * @private
+   */
+  private updateServerStatus(engineId: string, containerId: string): void {
+    // Inspect container
+    containerEngine.inspectContainer(engineId, containerId).then(result => {
+      const server = this.#servers.get(containerId);
+      if(server === undefined)
+        throw new Error('Something went wrong while trying to get container status got undefined Inference Server.');
+
+      console.log(`container ${containerId} state`, result.State);
+      this.log(containerId, `[INFO] state: ${result.State}.`);
+      this.log(containerId, `[DEBUG] health status: ${result.State.Health.Status}.`);
+
+      // Update server
+      this.#servers.set(containerId, {
+        ...server,
+        status: (result.State.Status === 'running')?'running':'stopped',
+        health: result.State.Health,
+      });
+    }).catch((err: unknown) => {
+      console.error(`Something went wrong while trying to inspect container ${containerId}. Trying to refresh servers.`, err);
+      this.retryableRefresh(2);
+    });
+  }
+
+  /**
    * Watch for container status changes
    * @param engineId
    * @param containerId the container to watch out
    */
   private watchContainerStatus(engineId: string, containerId: string): void {
+    // Update now
+    this.updateServerStatus(engineId, containerId);
+
     // Create a pulling update for container health check
-    const intervalId = setInterval(() => {
-      // Inspect container
-      containerEngine.inspectContainer(engineId, containerId).then(result => {
-        const server = this.#servers.get(containerId);
-        if(server === undefined)
-          throw new Error('Something went wrong while trying to get container status got undefined Inference Server.');
-
-        console.log(`container ${containerId} state`, result.State);
-        this.log(containerId, `[INFO] state: ${result.State}.`);
-        this.log(containerId, `[DEBUG] health status: ${result.State.Health.Status}.`);
-
-        // Update server
-        this.#servers.set(containerId, {
-          ...server,
-          status: (result.State.Status === 'running')?'running':'stopped',
-          ready: result.State.Health?.Status === 'healthy', // TODO: ensure Status string
-        });
-      }).catch((err: unknown) => {
-        // Ensure interval is cleared
-        clearInterval(intervalId);
-        console.error(`Something went wrong while trying to inspect container ${containerId}. Trying to refresh servers.`, err);
-        this.retryableRefresh(2);
-      });
-    }, 10000);
+    const intervalId = setInterval(
+      this.updateServerStatus.bind(this, [engineId, containerId]),
+      10000
+    );
 
     this.#disposables.push(Disposable.create(() => {
       clearInterval(intervalId);
@@ -201,6 +216,24 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
 
   private watchMachineEvent(event: 'start' | 'stop'): void {
     this.retryableRefresh(2);
+  }
+
+  /**
+   * Listener for container start events
+   * @param event the event containing the id of the container
+   */
+  private watchContainerStart(event: ContainerStart): void {
+    containerEngine.listContainers().then((containers) => {
+      const container = containers.find(c => c.Id === event.id);
+      if(container === undefined) {
+        return;
+      }
+      if(container.Labels && LABEL_INFERENCE_SERVER in container.Labels) {
+        this.watchContainerStatus(container.engineId, container.Id);
+      }
+    }).catch((err: unknown) => {
+      console.error(`Something went wrong in container start listener.`, err);
+    });
   }
 
   /**
@@ -247,7 +280,6 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
         connection: {
           port: (containerInfo.Ports.length > 0)?containerInfo.Ports[0].PublicPort:-1,
         },
-        ready: false,
         status: (containerInfo.Status === 'running')?'running':'stopped',
         models: [], // Will be fetched later through the API
       }
