@@ -18,8 +18,11 @@
 import {
   containerEngine,
   provider,
-  type ImageInfo,
-  type ProviderContainerConnection, ContainerCreateOptions,
+  type ContainerCreateOptions,
+  type ContainerProviderConnection,
+  type ImageInspectInfo,
+  type PullEvent,
+  type ProviderContainerConnection,
 } from '@podman-desktop/api';
 import { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 
@@ -28,24 +31,24 @@ export const LABEL_INFERENCE_SERVER: string = 'ai-studio-inference-server';
 /**
  * Return container connection provider
  */
-export function getContainerConnection(engineId?: string): ProviderContainerConnection {
-  // Get started engines
-  const engines = provider.getContainerConnections()
+export function getProviderContainerConnection(providerId?: string): ProviderContainerConnection {
+  // Get started providers
+  const providers = provider.getContainerConnections()
     .filter(connection => connection.connection.status() === 'started');
 
-  if(engines.length === 0)
+  if(providers.length === 0)
     throw new Error('no engine started could be find.');
 
   let output: ProviderContainerConnection | undefined = undefined;
 
   // If we expect a specific engine
-  if(engineId !== undefined) {
-    output = engines.find(engine => engine.providerId === engineId);
+  if(providerId !== undefined) {
+    output = providers.find(engine => engine.providerId === providerId);
   } else {
     // Have a preference for a podman engine
-    output = engines.find(engine => engine.connection.type === 'podman');
+    output = providers.find(engine => engine.connection.type === 'podman');
     if(output === undefined) {
-      output = engines[0];
+      output = providers[0];
     }
   }
   if(output === undefined)
@@ -54,26 +57,34 @@ export function getContainerConnection(engineId?: string): ProviderContainerConn
 }
 
 /**
- * Given an image name, it will return the ImageInfo corresponding. Will raise an error if not found.
+ * Given an image name, it will return the ImageInspectInfo corresponding. Will raise an error if not found.
+ * @param connection
  * @param image
- * @param engineId
+ * @param callback
  */
-export async function getImageInfo(image: string, engineId: string): Promise<ImageInfo> {
-  console.log(`get image ${image} with engineId ${engineId}.`);
-  // Get all images available
-  const images = await containerEngine.listImages();
-  console.log('all images', JSON.stringify(images));
-  // Filter on engineId
-  const imageInfo = images.find(im => im.engineId === engineId && im.RepoTags?.some(tag => tag === image));
-  // Throw error if not found.
-  if(imageInfo === undefined)
+export async function getImageInspectInfo(connection: ContainerProviderConnection, image: string, callback: (event: PullEvent) => void,): Promise<ImageInspectInfo> {
+  console.debug(`get image ${image} with connection ${connection.name}.`);
+
+  let imageInspectInfo: ImageInspectInfo;
+  try {
+    // Pull image
+    await containerEngine.pullImage(connection, image, callback);
+    // Get image inspect
+    imageInspectInfo = await containerEngine.findImageInspect(connection, image);
+  } catch(err: unknown) {
+    console.warn('Something went wrong while trying to get image inspect', err);
+    throw err;
+  }
+
+  if(imageInspectInfo === undefined)
     throw new Error(`image ${image} not found.`);
-  return imageInfo;
+  else
+    return imageInspectInfo;
 }
 
-export function GenerateContainerCreateOptions(config: InferenceServerConfig): ContainerCreateOptions {
+export function GenerateContainerCreateOptions(config: InferenceServerConfig, imageInspectInfo: ImageInspectInfo): ContainerCreateOptions {
   return {
-    Image: config.image.Id,
+    Image: imageInspectInfo.Id,
     Detach: true,
     ExposedPorts: { [`${config.port}`]: {} },
     HostConfig: {

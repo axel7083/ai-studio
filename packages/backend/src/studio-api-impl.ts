@@ -36,7 +36,7 @@ import path from 'node:path';
 import { InferenceServer } from '@shared/src/models/IInference';
 import { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import { InferenceManager } from './managers/playground/inferenceManager';
-import { getContainerConnection, getImageInfo } from './utils/inferenceUtils';
+import { getProviderContainerConnection } from './utils/inferenceUtils';
 
 export class StudioApiImpl implements StudioAPI {
   constructor(
@@ -51,15 +51,11 @@ export class StudioApiImpl implements StudioAPI {
   ) {
   }
 
-  getImageInfo(image: string): Promise<podmanDesktopApi.ImageInfo> {
-    const connection = getContainerConnection();
-    console.log('getImageInfo connection', connection);
-    return getImageInfo(image, connection.providerId);
-  }
-
   async getInferenceServer(): Promise<InferenceServer[]> {
     return this.inferenceManager.getServers();
   }
+  // idea: creating a LogRegistry, and return a LogId
+  // so the front can listen on it to see logs;
   startInferenceServer(config: InferenceServerConfig): Promise<void> {
     return this.inferenceManager.startInferenceServer(config);
   }

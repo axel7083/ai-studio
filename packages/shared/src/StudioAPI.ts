@@ -20,7 +20,7 @@ import type { ModelInfo } from './models/IModelInfo';
 import type { QueryState } from './models/IPlaygroundQueryState';
 import type { Catalog } from './models/ICatalog';
 import type { PlaygroundState } from './models/IPlaygroundState';
-import type { TelemetryTrustedValue, ImageInfo } from '@podman-desktop/api';
+import type { TelemetryTrustedValue } from '@podman-desktop/api';
 import type { EnvironmentState } from './models/IEnvironmentState';
 import type { Task } from './models/ITask';
 import type { LocalRepository } from './models/ILocalRepository';
@@ -74,11 +74,7 @@ export abstract class StudioAPI {
    */
   abstract downloadModel(modelId: string): Promise<void>;
 
-  /**
-   * Get image info
-   * @param image the name of the image
-   */
-  abstract getImageInfo(image: string): Promise<ImageInfo>;
+
 
   /**
    * Get inference servers

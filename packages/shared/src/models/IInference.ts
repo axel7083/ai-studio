@@ -9,8 +9,8 @@ export interface InferenceServer {
    * Container info
    */
   container: {
-    containerId: string;
     engineId: string;
+    containerId: string;
   };
   connection: {
     port: number,
@@ -27,4 +27,9 @@ export interface InferenceServer {
    * Exit code
    */
   exit?: number;
+  /**
+   * Logs
+   * @deprecated
+   */
+  logs?: string[];
 }

@@ -19,10 +19,16 @@ import type { InferenceServer } from '@shared/src/models/IInference';
 import type { PodmanConnection } from '../podmanConnection';
 import {
   containerEngine, ContainerInfo, Disposable,
+  ImageInspectInfo,
+  PullEvent,
   type TelemetryLogger, type Webview,
 } from '@podman-desktop/api';
 import type { ContainerRegistry } from '../../registries/ContainerRegistry';
-import { GenerateContainerCreateOptions, LABEL_INFERENCE_SERVER } from '../../utils/inferenceUtils';
+import {
+  GenerateContainerCreateOptions,
+  getImageInspectInfo, getProviderContainerConnection,
+  LABEL_INFERENCE_SERVER,
+} from '../../utils/inferenceUtils';
 import { Publisher } from '../../utils/Publisher';
 import { MSG_INFERENCE_SERVERS_UPDATE } from '@shared/Messages';
 import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
@@ -71,6 +77,26 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
   }
 
   /**
+   * This method add a log entry to the InferenceServer journal
+   * /!\ This is not related to the container logs.
+   *
+   * @param containerId the container identifier of the inference server
+   * @param message the log message to append
+   * @deprecated
+   */
+  private log(containerId: string, message: string): void {
+    const server = this.#servers.get(containerId);
+    if(server === undefined)
+      return;
+
+    this.#servers.set(containerId, {
+      ...server,
+      logs: (server.logs !== undefined)?[...server.logs, message]:[message],
+    })
+    this.notify();
+  }
+
+  /**
    * Given an engineId, it will start an inference server.
    * @param config
    */
@@ -78,14 +104,25 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
     if(!this.#initialized)
       throw new Error('Cannot start the inference server: not initialized.');
 
+    // Fetch a provider container connection
+    const provider = getProviderContainerConnection(config.providerId);
+
+    // Get the image inspect info
+    const imageInspectInfo: ImageInspectInfo = await getImageInspectInfo(provider.connection, config.image, (event: PullEvent) => {
+      console.debug('pull image event', event);
+    });
+
     // Create container on requested engine
-    const result = await containerEngine.createContainer(config.image.engineId, GenerateContainerCreateOptions(config));
+    const result = await containerEngine.createContainer(
+      imageInspectInfo.engineId,
+      GenerateContainerCreateOptions(config, imageInspectInfo),
+    );
 
     // Adding a new inference server
     this.#servers.set(result.id, {
       container: {
+        engineId: imageInspectInfo.engineId,
         containerId: result.id,
-        engineId: config.image.engineId,
       },
       connection: {
         port: config.port,
@@ -96,7 +133,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
     });
 
     // Watch for container changes
-    this.watchContainerStatus(config.image.engineId, result.id);
+    this.watchContainerStatus(imageInspectInfo.engineId, result.id);
 
     this.notify();
   }
@@ -116,11 +153,14 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
           throw new Error('Something went wrong while trying to get container status got undefined Inference Server.');
 
         console.log(`container ${containerId} state`, result.State);
+        this.log(containerId, `[INFO] state: ${result.State}.`);
+        this.log(containerId, `[DEBUG] health status: ${result.State.Health.Status}.`);
+
         // Update server
         this.#servers.set(containerId, {
           ...server,
           status: (result.State.Status === 'running')?'running':'stopped',
-          ready: result.State.Health.Status === 'healthy', // TODO: ensure Status string
+          ready: result.State.Health?.Status === 'healthy', // TODO: ensure Status string
         });
       }).catch((err: unknown) => {
         // Ensure interval is cleared

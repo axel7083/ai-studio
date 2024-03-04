@@ -1,14 +1,16 @@
-import type { ImageInfo } from '@podman-desktop/api';
-
 export interface InferenceServerConfig {
   /**
    * Port to expose
    */
   port: number,
   /**
-   * Image info for the container
+   * The identifier of the container provider to use
    */
-  image: ImageInfo,
+  providerId?: string;
+  /**
+   * Image to use
+   */
+  image: string,
   /**
    * Labels to use for the container
    */
