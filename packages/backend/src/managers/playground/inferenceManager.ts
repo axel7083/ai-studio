@@ -18,15 +18,17 @@
 import type { InferenceServer } from '@shared/src/models/IInference';
 import type { PodmanConnection } from '../podmanConnection';
 import {
-  containerEngine, ContainerInfo, Disposable,
-  ImageInspectInfo,
+  containerEngine,
+  ContainerInfo,
+  Disposable,
+  ImageInfo,
   PullEvent,
   type TelemetryLogger, type Webview,
 } from '@podman-desktop/api';
 import type { ContainerRegistry } from '../../registries/ContainerRegistry';
 import {
   GenerateContainerCreateOptions,
-  getImageInspectInfo, getProviderContainerConnection,
+  getImageInfo, getProviderContainerConnection,
   LABEL_INFERENCE_SERVER,
 } from '../../utils/inferenceUtils';
 import { Publisher } from '../../utils/Publisher';
@@ -89,6 +91,8 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
     if(server === undefined)
       return;
 
+    console.debug(`[${containerId}]: ${message}`);
+
     this.#servers.set(containerId, {
       ...server,
       logs: (server.logs !== undefined)?[...server.logs, message]:[message],
@@ -108,32 +112,37 @@ export class InferenceManager extends Publisher<InferenceServer[]> {
     const provider = getProviderContainerConnection(config.providerId);
 
     // Get the image inspect info
-    const imageInspectInfo: ImageInspectInfo = await getImageInspectInfo(provider.connection, config.image, (event: PullEvent) => {
+    const imageInfo: ImageInfo = await getImageInfo(provider.connection, config.image, (event: PullEvent) => {
       console.debug('pull image event', event);
     });
 
     // Create container on requested engine
     const result = await containerEngine.createContainer(
-      imageInspectInfo.engineId,
-      GenerateContainerCreateOptions(config, imageInspectInfo),
+      imageInfo.engineId,
+      GenerateContainerCreateOptions(config, imageInfo),
     );
 
     // Adding a new inference server
     this.#servers.set(result.id, {
       container: {
-        engineId: imageInspectInfo.engineId,
+        engineId: imageInfo.engineId,
         containerId: result.id,
       },
       connection: {
         port: config.port,
       },
       status: 'running',
-      models: [],
+      models: config.modelsInfo,
       ready: false,
     });
 
     // Watch for container changes
-    this.watchContainerStatus(imageInspectInfo.engineId, result.id);
+    this.watchContainerStatus(imageInfo.engineId, result.id);
+
+    // Log usage
+    this.telemetry.logUsage('inference.start', {
+      models: config.modelsInfo.map(model => model.id),
+    });
 
     this.notify();
   }

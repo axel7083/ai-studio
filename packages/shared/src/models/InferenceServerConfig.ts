@@ -1,3 +1,5 @@
+import type { ModelInfo } from './IModelInfo';
+
 export interface InferenceServerConfig {
   /**
    * Port to expose
@@ -15,8 +17,9 @@ export interface InferenceServerConfig {
    * Labels to use for the container
    */
   labels: {[id: string]: string},
+
   /**
-   * Path to the local models directory
+   * Model info for the models
    */
-  models: string,
+  modelsInfo: ModelInfo[];
 }

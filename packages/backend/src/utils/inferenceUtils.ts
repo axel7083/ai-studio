@@ -20,9 +20,8 @@ import {
   provider,
   type ContainerCreateOptions,
   type ContainerProviderConnection,
-  type ImageInspectInfo,
   type PullEvent,
-  type ProviderContainerConnection,
+  type ProviderContainerConnection, ImageInfo, ListImagesOptions, MountConfig, MountSettings,
 } from '@podman-desktop/api';
 import { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 
@@ -62,40 +61,58 @@ export function getProviderContainerConnection(providerId?: string): ProviderCon
  * @param image
  * @param callback
  */
-export async function getImageInspectInfo(connection: ContainerProviderConnection, image: string, callback: (event: PullEvent) => void,): Promise<ImageInspectInfo> {
+export async function getImageInfo(connection: ContainerProviderConnection, image: string, callback: (event: PullEvent) => void,): Promise<ImageInfo> {
   console.debug(`get image ${image} with connection ${connection.name}.`);
 
-  let imageInspectInfo: ImageInspectInfo;
+  let imageInfo: ImageInfo;
   try {
     // Pull image
     await containerEngine.pullImage(connection, image, callback);
     // Get image inspect
-    imageInspectInfo = await containerEngine.findImageInspect(connection, image);
+    imageInfo = (await containerEngine.listImages({
+      provider: connection,
+    } as ListImagesOptions)).find((imageInfo) => imageInfo.RepoTags?.some((tag) => tag === image));
   } catch(err: unknown) {
     console.warn('Something went wrong while trying to get image inspect', err);
     throw err;
   }
 
-  if(imageInspectInfo === undefined)
+  if(imageInfo === undefined)
     throw new Error(`image ${image} not found.`);
-  else
-    return imageInspectInfo;
+
+  return imageInfo;
 }
 
-export function GenerateContainerCreateOptions(config: InferenceServerConfig, imageInspectInfo: ImageInspectInfo): ContainerCreateOptions {
+/**
+ * Given an {@link InferenceServerConfig} and an {@link ImageInfo} generate a container creation options object
+ * @param config the config to use
+ * @param imageInfo the image to use
+ */
+export function GenerateContainerCreateOptions(config: InferenceServerConfig, imageInfo: ImageInfo): ContainerCreateOptions {
+  if(config.modelsInfo.length === 0)
+    throw new Error('Need at least one model info to start an inference server.');
+
+  if(config.modelsInfo.length > 1) {
+    throw new Error('Currently the inference server does not support multiple models serving.');
+  }
+
+  const modelInfo = config.modelsInfo[0];
+
+  if(modelInfo.file === undefined) {
+    throw new Error('The model info file provided is undefined');
+  }
+
   return {
-    Image: imageInspectInfo.Id,
+    Image: imageInfo.Id,
     Detach: true,
     ExposedPorts: { [`${config.port}`]: {} },
     HostConfig: {
-      AutoRemove: true,
-      Mounts: [
-        {
-          Target: '/models',
-          Source: config.models,
-          Type: 'bind',
-        },
-      ],
+      AutoRemove: false,
+      Mounts: [{
+        Target: '/models',
+        Source: modelInfo.file.path,
+        Type: 'bind',
+      }],
       PortBindings: {
         '8000/tcp': [
           {
@@ -108,7 +125,7 @@ export function GenerateContainerCreateOptions(config: InferenceServerConfig, im
       ...config.labels,
       LABEL_INFERENCE_SERVER: 'true',
     },
-    Env: [`MODEL_PATH=/models/${config.models}`],
-    Cmd: ['--models-path', '/models', '--context-size', '700', '--threads', '4'],
+    Env: [`MODEL_PATH=/models/${modelInfo.file.file}`],
+    Cmd: ['--context-size', '700', '--threads', '4'],
   };
 }

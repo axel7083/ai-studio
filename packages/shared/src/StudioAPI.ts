@@ -41,11 +41,29 @@ export abstract class StudioAPI {
    * Delete the folder containing the model from local storage
    */
   abstract requestRemoveLocalModel(modelId: string): Promise<void>;
+
+  /**
+   * @deprecated
+   */
   abstract startPlayground(modelId: string): Promise<void>;
+  /**
+   * @deprecated
+   */
   abstract stopPlayground(modelId: string): Promise<void>;
+  /**
+   * @deprecated
+   */
   abstract askPlayground(modelId: string, prompt: string): Promise<number>;
+  /**
+   * @deprecated
+   */
   abstract getPlaygroundQueriesState(): Promise<QueryState[]>;
+  /**
+   * @deprecated
+   */
   abstract getPlaygroundsState(): Promise<PlaygroundState[]>;
+
+
   abstract getModelsDirectory(): Promise<string>;
 
   abstract navigateToContainer(containerId: string): Promise<void>;

@@ -36,8 +36,17 @@ import OpenAI from 'openai';
 import { getDurationSecondsSince, timeout } from '../../utils/utils';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
 
+/**
+ * @deprecated
+ */
 export const LABEL_MODEL_ID = 'ai-studio-model-id';
+/**
+ * @deprecated
+ */
 export const LABEL_MODEL_PORT = 'ai-studio-model-port';
+/**
+ * @deprecated
+ */
 export const LABEL_MODEL_PORTS = 'ai-studio-model-ports';
 
 // TODO: this should not be hardcoded
@@ -45,6 +54,9 @@ const PLAYGROUND_IMAGE = 'quay.io/bootsy/playground:v0';
 
 const STARTING_TIME_MAX = 3600 * 1000;
 
+/**
+ * @deprecated
+ */
 function findFirstProvider(): ProviderContainerConnection | undefined {
   const engines = provider
     .getContainerConnections()
@@ -53,6 +65,9 @@ function findFirstProvider(): ProviderContainerConnection | undefined {
   return engines.length > 0 ? engines[0] : undefined;
 }
 
+/**
+ * @deprecated
+ */
 export class PlayGroundManager {
   private queryIdCounter = 0;
 
@@ -70,6 +85,9 @@ export class PlayGroundManager {
     this.queries = new Map<number, QueryState>();
   }
 
+  /**
+   * @deprecated
+   */
   adoptRunningPlaygrounds() {
     this.podmanConnection.startupSubscribe(() => {
       containerEngine
@@ -110,11 +128,17 @@ export class PlayGroundManager {
     });
   }
 
+  /**
+   * @deprecated
+   */
   async selectImage(image: string): Promise<ImageInfo | undefined> {
     const images = (await containerEngine.listImages()).filter(im => im.RepoTags?.some(tag => tag === image));
     return images.length > 0 ? images[0] : undefined;
   }
 
+  /**
+   * @deprecated
+   */
   setPlaygroundStatus(modelId: string, status: PlaygroundStatus): void {
     this.updatePlaygroundState(modelId, {
       modelId: modelId,
@@ -123,6 +147,9 @@ export class PlayGroundManager {
     });
   }
 
+  /**
+   * @deprecated
+   */
   setPlaygroundError(modelId: string, error: string): void {
     const state: Partial<PlaygroundState> = this.playgrounds.get(modelId) || {};
     this.updatePlaygroundState(modelId, {
@@ -133,6 +160,9 @@ export class PlayGroundManager {
     });
   }
 
+  /**
+   * @deprecated
+   */
   updatePlaygroundState(modelId: string, state: PlaygroundState): void {
     this.playgrounds.set(modelId, {
       ...state,
@@ -141,6 +171,9 @@ export class PlayGroundManager {
     this.sendPlaygroundState();
   }
 
+  /**
+   * @deprecated
+   */
   sendPlaygroundState() {
     this.webview
       .postMessage({
@@ -152,6 +185,9 @@ export class PlayGroundManager {
       });
   }
 
+  /**
+   * @deprecated
+   */
   async startPlayground(modelId: string, modelPath: string): Promise<string> {
     const startTime = performance.now();
     // TODO(feloy) remove previous query from state?
@@ -278,6 +314,9 @@ export class PlayGroundManager {
     return result.id;
   }
 
+  /**
+   * @deprecated
+   */
   async stopPlayground(modelId: string): Promise<void> {
     const startTime = performance.now();
     const state = this.playgrounds.get(modelId);
@@ -304,6 +343,9 @@ export class PlayGroundManager {
     this.telemetry.logUsage('playground.stop', { 'model.id': modelId, durationSeconds });
   }
 
+  /**
+   * @deprecated
+   */
   async askPlayground(modelInfo: ModelInfo, prompt: string): Promise<number> {
     const startTime = performance.now();
     const state = this.playgrounds.get(modelInfo.id);
@@ -347,17 +389,30 @@ export class PlayGroundManager {
     return query.id;
   }
 
+  /**
+   * @deprecated
+   */
   getNextQueryId() {
     return ++this.queryIdCounter;
   }
+
+  /**
+   * @deprecated
+   */
   getQueriesState(): QueryState[] {
     return Array.from(this.queries.values());
   }
 
+  /**
+   * @deprecated
+   */
   getPlaygroundsState(): PlaygroundState[] {
     return Array.from(this.playgrounds.values());
   }
 
+  /**
+   * @deprecated
+   */
   sendQueriesState(): void {
     this.webview
       .postMessage({
