@@ -15,25 +15,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
+import { RPCReadable } from '/@/stores/rpcReadable';
+import { MSG_INFERENCE_SERVERS_UPDATE } from '@shared/Messages';
+import { studioClient } from '/@/utils/client';
+import type { InferenceServer } from '@shared/src/models/IInference';
 
-import type { Readable } from 'svelte/store';
-import { readable } from 'svelte/store';
-import type { QueryState } from '@shared/src/models/IPlaygroundQueryState';
-import { MSG_NEW_PLAYGROUND_QUERIES_STATE } from '@shared/Messages';
-import { rpcBrowser, studioClient } from '/@/utils/client';
-
-/**
- * @deprecated
- */
-export const playgroundQueries: Readable<QueryState[]> = readable<QueryState[]>([], set => {
-  const sub = rpcBrowser.subscribe(MSG_NEW_PLAYGROUND_QUERIES_STATE, msg => {
-    set(msg);
-  });
-  // Initialize the store manually
-  studioClient.getPlaygroundQueriesState().then(state => {
-    set(state);
-  });
-  return () => {
-    sub.unsubscribe();
-  };
-});
+export const inferenceServers = RPCReadable<InferenceServer[]>([], [MSG_INFERENCE_SERVERS_UPDATE], studioClient.getInferenceServer);

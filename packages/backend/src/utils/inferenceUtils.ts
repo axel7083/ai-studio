@@ -121,11 +121,16 @@ export function GenerateContainerCreateOptions(config: InferenceServerConfig, im
         ],
       },
     },
+    HealthCheck: {
+      Test: ['CMD-SHELL', `curl -sSf localhost:${config.port}/docs > /dev/null`],
+      Interval: 1_000_000_000 * 15, // 15s
+      Retries: 4 * 5, // 20 * 15s = 300s = 5 minutes
+    },
     Labels: {
       ...config.labels,
-      LABEL_INFERENCE_SERVER: 'true',
+      [LABEL_INFERENCE_SERVER]: 'true',
     },
     Env: [`MODEL_PATH=/models/${modelInfo.file.file}`],
-    Cmd: ['--context-size', '700', '--threads', '4'],
+    Cmd: ['--models-path', '/models', '--context-size', '700', '--threads', '4'],
   };
 }
