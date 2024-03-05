@@ -13,6 +13,8 @@ import Recipe from '/@/pages/Recipe.svelte';
 import Model from './pages/Model.svelte';
 import { onMount } from 'svelte';
 import { getRouterState } from '/@/utils/client';
+import Services from '/@/pages/InferenceServers.svelte';
+import ServiceDetails from '/@/pages/InferenceServerDetails.svelte';
 
 router.mode.hash();
 
@@ -60,6 +62,14 @@ onMount(() => {
       </Route>
       <Route path="/model/:id/*" breadcrumb="Model Details" let:meta>
         <Model modelId="{meta.params.id}" />
+      </Route>
+
+      <Route path="/services/*" breadcrumb="Services">
+        <Services />
+      </Route>
+
+      <Route path="/service/:id/*" breadcrumb="Service Details"  let:meta>
+        <ServiceDetails containerId="{meta.params.id}" />
       </Route>
     </div>
   </main>

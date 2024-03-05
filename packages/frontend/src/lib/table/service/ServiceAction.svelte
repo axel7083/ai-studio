@@ -1,0 +1,31 @@
+<script lang="ts">
+import type { InferenceServer } from '@shared/src/models/IInference';
+import StatusIcon from '/@/lib/StatusIcon.svelte';
+import ContainerIcon from '/@/lib/images/ContainerIcon.svelte';
+import { studioClient } from '/@/utils/client';
+import Spinner from '/@/lib/button/Spinner.svelte';
+import { faPlay, faStop, faTrash } from '@fortawesome/free-solid-svg-icons';
+import ListItemButtonIcon from '/@/lib/button/ListItemButtonIcon.svelte';
+export let object: InferenceServer;
+
+function stopInferenceServer() {
+  studioClient.stopInferenceServer(object.container.containerId);
+}
+
+function startInferenceServer() {
+  studioClient.startInferenceServer(object.container.containerId);
+}
+
+function deleteInferenceServer() {
+  alert('not implemented');
+}
+
+</script>
+
+{#if object.status === 'running'}
+  <ListItemButtonIcon icon="{faStop}" onClick="{stopInferenceServer}" title="Stop container" />
+{:else}
+  <ListItemButtonIcon icon="{faPlay}" onClick="{startInferenceServer}" title="Start container" />
+  <ListItemButtonIcon icon="{faTrash}" onClick="{deleteInferenceServer}" title="Delete container" />
+{/if}
+
