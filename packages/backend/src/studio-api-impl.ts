@@ -57,13 +57,17 @@ export class StudioApiImpl implements StudioAPI {
 
   // idea: creating a LogRegistry, and return a LogId
   // so the front can listen on it to see logs;
-  startInferenceServer(config: InferenceServerConfig): Promise<void> {
+  createInferenceServer(config: InferenceServerConfig): Promise<void> {
     try {
-      return this.inferenceManager.startInferenceServer(config);
+      return this.inferenceManager.createInferenceServer(config);
     } catch (err: unknown) {
       console.error('Something went wrong while trying to start inference server', err);
       throw err;
     }
+  }
+
+  startInferenceServer(containerId: string): Promise<void> {
+    return this.inferenceManager.startInferenceServer(containerId);
   }
 
   stopInferenceServer(containerId: string): Promise<void> {

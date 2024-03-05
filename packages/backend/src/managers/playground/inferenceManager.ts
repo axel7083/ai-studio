@@ -110,31 +110,26 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
   }
 
   /**
-   * Given an engineId, it will start an inference server.
+   * Given an engineId, it will create an inference server.
    * @param config
    */
-  async startInferenceServer(config: InferenceServerConfig): Promise<void> {
-    console.log(`[InferenceManager] startInferenceServer`);
-    if(!this.#initialized)
+  async createInferenceServer(config: InferenceServerConfig): Promise<void> {
+    if(!this.isInitialize())
       throw new Error('Cannot start the inference server: not initialized.');
 
     // Fetch a provider container connection
     const provider = getProviderContainerConnection(config.providerId);
-    console.log(`[InferenceManager] startInferenceServer: got provider ${provider.providerId}`);
 
     // Get the image inspect info
     const imageInfo: ImageInfo = await getImageInfo(provider.connection, config.image, (event: PullEvent) => {
       console.debug('pull image event', event);
     });
-    console.log(`[InferenceManager] startInferenceServer: got imageInfo engineId ${imageInfo.engineId} imageId ${imageInfo.Id}`);
 
     // Create container on requested engine
     const result = await containerEngine.createContainer(
       imageInfo.engineId,
       GenerateContainerCreateOptions(config, imageInfo),
     );
-
-    console.log(`[InferenceManager] startInferenceServer: container created ${result.id}`);
 
     // Adding a new inference server
     this.#servers.set(result.id, {
@@ -167,14 +162,12 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
    * @private
    */
   private updateServerStatus(engineId: string, containerId: string): void {
-    console.log(`[InferenceManager] updateServerStatus engineId ${engineId} containerId ${containerId}`);
     // Inspect container
     containerEngine.inspectContainer(engineId, containerId).then(result => {
       const server = this.#servers.get(containerId);
       if(server === undefined)
         throw new Error('Something went wrong while trying to get container status got undefined Inference Server.');
 
-      console.log(`container ${containerId} state`, result.State);
       this.log(containerId, `[INFO] state: ${result.State}.`);
       this.log(containerId, `[DEBUG] health status: ${result.State.Health.Status}.`);
 
@@ -196,7 +189,6 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
    * @param containerId the container to watch out
    */
   private watchContainerStatus(engineId: string, containerId: string): void {
-    console.log(`[InferenceManager] watchContainerStatus engineId ${engineId} containerId ${containerId}`);
     // Update now
     this.updateServerStatus(engineId, containerId);
 
@@ -211,7 +203,6 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
     }));
     // Subscribe to container status update
     const disposable = this.containerRegistry.subscribe(containerId, (status: string) => {
-      console.log(`watchContainerStatus status: ${status}`);
       switch (status) {
         case 'remove':
           // Update the list of servers
@@ -234,7 +225,6 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
    * @param event the event containing the id of the container
    */
   private watchContainerStart(event: ContainerStart): void {
-    console.log(`[InferenceManager] watchContainerStart ${event}`);
     // We might have a start event for an inference server we already know about
     if(this.#servers.has(event.id))
       return;
@@ -280,13 +270,10 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
    * This method has an important impact as it (re-)create all inference servers
    */
   private async refreshInferenceServers(): Promise<void> {
-    console.log('[InferenceManager] refreshInferenceServers');
     const containers: ContainerInfo[] = await containerEngine.listContainers();
-    console.log(`[InferenceManager] found ${containers.length} containers.`);
     const filtered = containers.filter(
       c => c.Labels && LABEL_INFERENCE_SERVER in c.Labels,
     );
-    console.log(`[InferenceManager] ${filtered.length} has the proper label.`);
 
     // clean existing disposables
     this.cleanDisposables();
@@ -304,8 +291,6 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
         models: [], // Will be fetched later through the API
       }
     ]));
-
-    console.log(`[InferenceManager] added ${this.#servers.size} server to #servers.`);
 
     // (re-)create container watchers
     this.#servers.forEach(server => this.watchContainerStatus(
@@ -327,11 +312,40 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
   }
 
   /**
+   * Start an inference server from the container id
+   * @param containerId the identifier of the container to start
+   */
+  async startInferenceServer(containerId: string): Promise<void> {
+    if(!this.isInitialize())
+      throw new Error('Cannot start the inference server.');
+
+    const server = this.#servers.get(containerId);
+    if(server === undefined)
+      throw new Error(`cannot find a corresponding server for container id ${containerId}.`);
+
+    try {
+      await containerEngine.startContainer(server.container.engineId, server.container.containerId);
+      this.#servers.set(server.container.containerId, {
+        ...server,
+        status: 'running',
+        health: undefined
+      });
+      this.notify();
+    } catch (error: unknown) {
+      console.error(error);
+      this.telemetry.logError('inference.start', {
+        message: 'error starting inference',
+        error: error,
+      });
+    }
+  }
+
+  /**
    * Stop an inference server from the container id
    * @param containerId the identifier of the container to stop
    */
   async stopInferenceServer(containerId?: string): Promise<void> {
-    if(!this.#initialized)
+    if(!this.isInitialize())
       throw new Error('Cannot stop the inference server.');
 
     const server = this.#servers.get(containerId);
@@ -340,7 +354,11 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
 
     try {
       await containerEngine.stopContainer(server.container.engineId, server.container.containerId);
-      this.removeInferenceServer(containerId);
+      this.#servers.set(server.container.containerId, {
+        ...server,
+        status: 'stopped',
+      });
+      this.notify();
     } catch (error: unknown) {
       console.error(error);
       this.telemetry.logError('inference.stop', {

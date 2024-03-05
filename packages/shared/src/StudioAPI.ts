@@ -92,8 +92,6 @@ export abstract class StudioAPI {
    */
   abstract downloadModel(modelId: string): Promise<void>;
 
-
-
   /**
    * Get inference servers
    */
@@ -103,7 +101,13 @@ export abstract class StudioAPI {
    * Start an inference server
    * @param config The configuration to use
    */
-  abstract startInferenceServer(config: InferenceServerConfig): Promise<void>;
+  abstract createInferenceServer(config: InferenceServerConfig): Promise<void>;
+
+  /**
+   * Start an inference server
+   * @param containerId the container id of the inference server
+   */
+  abstract startInferenceServer(containerId: string): Promise<void>;
 
   /**
    * Stop an inference server
