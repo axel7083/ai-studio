@@ -129,7 +129,7 @@ export function GenerateContainerCreateOptions(config: InferenceServerConfig, im
     },
     Labels: {
       ...config.labels,
-      [LABEL_INFERENCE_SERVER]: 'true',
+      [LABEL_INFERENCE_SERVER]: JSON.stringify(config.modelsInfo.map((model) => model.id)),
     },
     Env: [`MODEL_PATH=/models/${modelInfo.file.file}`],
     Cmd: ['--models-path', '/models', '--context-size', '700', '--threads', '4'],

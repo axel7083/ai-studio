@@ -2,14 +2,13 @@
 import { inferenceServers } from '/@/stores/inferenceServers';
 import NavPage from '/@/lib/NavPage.svelte';
 import ServiceStatus from '/@/lib/table/service/ServiceStatus.svelte';
-import type { InferenceServer } from '@shared/src/models/IInference';
 import ServiceAction from '/@/lib/table/service/ServiceAction.svelte';
 import Fa from 'svelte-fa';
 import { faCopy, faMicrochip } from '@fortawesome/free-solid-svg-icons';
 
 export let containerId: string | undefined = undefined;
 
-let service: InferenceServer | undefined = $inferenceServers.find(server => server.container.containerId === containerId);
+$: service = $inferenceServers.find(server => server.container.containerId === containerId);
 
 const copyAddress = () => {
   alert('not implemented');

@@ -154,6 +154,7 @@ export class Studio {
       this.#panel.webview,
       containerRegistry,
       podmanConnection,
+      this.modelsManager,
       this.telemetry,
     );
 

@@ -35,6 +35,7 @@ import { Publisher } from '../../utils/Publisher';
 import { MSG_INFERENCE_SERVERS_UPDATE } from '@shared/Messages';
 import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import { Manager } from '../IManager';
+import { ModelsManager } from '../modelsManager';
 
 export class InferenceManager extends Publisher<InferenceServer[]> implements Manager {
   // Inference server map (containerId -> InferenceServer)
@@ -48,6 +49,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
     webview: Webview,
     private containerRegistry: ContainerRegistry,
     private podmanConnection: PodmanConnection,
+    private modelsManager: ModelsManager,
     private telemetry: TelemetryLogger
   ) {
     super(webview, MSG_INFERENCE_SERVERS_UPDATE, () => this.getServers());
@@ -85,28 +87,6 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
    */
   public getServers(): InferenceServer[] {
     return Array.from(this.#servers.values());
-  }
-
-  /**
-   * This method add a log entry to the InferenceServer journal
-   * /!\ This is not related to the container logs.
-   *
-   * @param containerId the container identifier of the inference server
-   * @param message the log message to append
-   * @deprecated
-   */
-  private log(containerId: string, message: string): void {
-    const server = this.#servers.get(containerId);
-    if(server === undefined)
-      return;
-
-    console.debug(`[${containerId}]: ${message}`);
-
-    this.#servers.set(containerId, {
-      ...server,
-      logs: (server.logs !== undefined)?[...server.logs, message]:[message],
-    })
-    this.notify();
   }
 
   /**
@@ -167,9 +147,6 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
       const server = this.#servers.get(containerId);
       if(server === undefined)
         throw new Error('Something went wrong while trying to get container status got undefined Inference Server.');
-
-      this.log(containerId, `[INFO] state: ${result.State}.`);
-      this.log(containerId, `[DEBUG] health status: ${result.State.Health.Status}.`);
 
       // Update server
       this.#servers.set(containerId, {
@@ -277,20 +254,29 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Ma
 
     // clean existing disposables
     this.cleanDisposables();
-    this.#servers = new Map<string, InferenceServer>(filtered.map(containerInfo => [
-      containerInfo.Id,
-      {
-        container: {
-          containerId: containerInfo.Id,
-          engineId: containerInfo.engineId,
-        },
-        connection: {
-          port: (containerInfo.Ports.length > 0)?containerInfo.Ports[0].PublicPort:-1,
-        },
-        status: (containerInfo.Status === 'running')?'running':'stopped',
-        models: [], // Will be fetched later through the API
+    this.#servers = new Map<string, InferenceServer>(filtered.map(containerInfo => {
+      let modelsId: string[] = [];
+      try {
+        modelsId = JSON.parse(containerInfo.Labels[LABEL_INFERENCE_SERVER]);
+      } catch (err: unknown) {
+        console.error('Something went wrong while getting the models ids from the label.', err);
       }
-    ]));
+
+      return [
+        containerInfo.Id,
+        {
+          container: {
+            containerId: containerInfo.Id,
+            engineId: containerInfo.engineId,
+          },
+          connection: {
+            port: (!!containerInfo.Ports && containerInfo.Ports.length > 0)?containerInfo.Ports[0].PublicPort:-1,
+          },
+          status: (containerInfo.Status === 'running')?'running':'stopped',
+          models: modelsId.map(id => this.modelsManager.getModelInfo(id)),
+        }
+      ];
+    }));
 
     // (re-)create container watchers
     this.#servers.forEach(server => this.watchContainerStatus(
