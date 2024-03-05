@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import { type Webview, type TelemetryLogger, containerEngine, Disposable } from "@podman-desktop/api";
+import { type Webview, type TelemetryLogger, containerEngine } from "@podman-desktop/api";
 import type { ContainerRegistry } from '../../registries/ContainerRegistry';
 import type { PodmanConnection } from '../podmanConnection';
 import { beforeEach, expect, describe, test, vi } from 'vitest';

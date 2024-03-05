@@ -157,10 +157,12 @@ export class Studio {
       this.telemetry,
     );
 
-    // TODO: init lazily (only when the webview open)
-    this.#inferenceManager.init();
-
     this.#panel.onDidChangeViewState((e: WebviewPanelOnDidChangeViewStateEvent) => {
+      // Lazily init inference manager
+      if(!this.#inferenceManager.isInitialize()) {
+        this.#extensionContext.subscriptions.push(this.#inferenceManager.init());
+      }
+
       this.telemetry.logUsage(e.webviewPanel.visible ? 'opened' : 'closed');
     });
 

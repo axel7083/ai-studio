@@ -122,7 +122,8 @@ export function GenerateContainerCreateOptions(config: InferenceServerConfig, im
       },
     },
     HealthCheck: {
-      Test: ['CMD-SHELL', `curl -sSf localhost:${config.port}/docs > /dev/null`],
+      // must be the port INSIDE the container not the exposed one
+      Test: ['CMD-SHELL', `curl -sSf localhost:8000/docs > /dev/null`],
       Interval: 1_000_000_000 * 15, // 15s
       Retries: 4 * 5, // 20 * 15s = 300s = 5 minutes
     },

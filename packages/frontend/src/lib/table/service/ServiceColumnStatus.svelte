@@ -11,6 +11,10 @@ function navigateToContainer() {
 }
 
 function getStatus(): 'RUNNING' | 'STARTING' | 'DEGRADED' | '' {
+  if(object.status === 'stopped') {
+    return '';
+  }
+
   switch (object.health?.Status) {
     case 'healthy':
       return 'RUNNING';

@@ -8,7 +8,7 @@ import { inferenceServers } from '/@/stores/inferenceServers';
 import ServiceColumnStatus from '/@/lib/table/service/ServiceColumnStatus.svelte';
 
 const columns: Column<InferenceServer>[] = [
-  new Column<InferenceServer>('Status', { width: '50px', renderer: ServiceColumnStatus }),
+  new Column<InferenceServer>('Status', { width: '50px', renderer: ServiceColumnStatus, align: 'center' }),
   new Column<InferenceServer>('Name', { width: '3fr', renderer: ServiceColumnName, align: 'center' }),
 ];
 const row = new Row<InferenceServer>({});
