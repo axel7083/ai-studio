@@ -5,10 +5,12 @@ import ServiceStatus from '/@/lib/table/service/ServiceStatus.svelte';
 import ServiceAction from '/@/lib/table/service/ServiceAction.svelte';
 import Fa from 'svelte-fa';
 import { faBuildingColumns, faCopy, faMicrochip, faScaleBalanced } from '@fortawesome/free-solid-svg-icons';
+import { onMount } from 'svelte';
+import type { InferenceServer } from '@shared/src/models/IInference';
 
 export let containerId: string | undefined = undefined;
 
-$: service = $inferenceServers.find(server => server.container.containerId === containerId);
+let service: InferenceServer | undefined;
 
 const copyAddress = () => {
   alert('not implemented');
@@ -17,6 +19,11 @@ const copyAddress = () => {
 const copyCodeSnippet = () => {
   alert('not implemented');
 }
+
+onMount(inferenceServers.subscribe((servers) => {
+  service = servers.find(server => server.container.containerId === containerId)
+}));
+
 </script>
 <NavPage title="Service Details" searchEnabled="{false}">
   <svelte:fragment slot="content">
@@ -25,9 +32,9 @@ const copyCodeSnippet = () => {
         <div class="mt-4 px-5 space-y-5 h-full">
           {#if service !== undefined}
             <!-- container details -->
-            <div class="bg-charcoal-800 rounded-md w-full p-4">
+            <div class="bg-charcoal-800 rounded-md w-full px-4 pt-2 pb-4">
               <!-- container info -->
-              <span class="text-base">Container</span>
+              <span class="text-sm">Container</span>
               <div class="w-full bg-charcoal-600 rounded-md p-2 flex items-center">
                 <div class="grow ml-2 flex flex-row">
                   <ServiceStatus object={service} />
@@ -40,11 +47,11 @@ const copyCodeSnippet = () => {
 
               <!-- models info -->
               <div class="mt-4">
-                <span class="text-base">Models</span>
+                <span class="text-sm">Models</span>
                 <div class="w-full bg-charcoal-600 rounded-md p-2 flex flex-col gap-y-4">
                   {#each service.models as model}
                     <div class="flex flex-row gap-2 items-center">
-                      <div class="grow">{model.name}</div>
+                      <div class="grow text-sm">{model.name}</div>
                       <div>
                         <div class="bg-charcoal-800 rounded-md p-2 flex flex-row w-min h-min text-xs text-charcoal-100 text-nowrap items-center" >
                           <Fa class="mr-2" icon="{faScaleBalanced}" />
@@ -64,8 +71,8 @@ const copyCodeSnippet = () => {
             </div>
 
             <!-- server details -->
-            <div class="bg-charcoal-800 rounded-md w-full p-4 mt-2">
-              <span class="text-base">Server</span>
+            <div class="bg-charcoal-800 rounded-md w-full px-4 pt-2 pb-4 mt-2">
+              <span class="text-sm">Server</span>
               <div class="flex flex-row gap-4">
                 <div class="bg-charcoal-600 rounded-md p-2 flex flex-row w-min h-min text-xs text-nowrap items-center" >
                   http://localhost:{service.connection.port}/v1
@@ -82,17 +89,18 @@ const copyCodeSnippet = () => {
             </div>
 
             <!-- code client -->
-            <div class="flex flex-row">
-              <span class="text-base grow">Client code</span>
-              <button title="copy" class="ml-2" on:click={copyCodeSnippet}>
-                <Fa icon="{faCopy}" />
-              </button>
+            <div>
+              <div class="flex flex-row">
+                <span class="text-base grow">Client code</span>
+                <button title="copy" class="ml-2" on:click={copyCodeSnippet}>
+                  <Fa icon="{faCopy}" />
+                </button>
+              </div>
+
+              <div class="bg-charcoal-900 rounded-md w-full p-4 mt-2">
+
+              </div>
             </div>
-
-            <div class="bg-charcoal-900 rounded-md w-full p-4 mt-2">
-
-            </div>
-
           {/if}
         </div>
       </div>

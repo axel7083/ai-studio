@@ -27,12 +27,14 @@ function getStatus(): 'RUNNING' | 'STARTING' | 'DEGRADED' | '' {
   }
 }
 </script>
+{#key object}
+  {#if object.health === undefined}
+    <Spinner/>
+  {:else}
+    <button on:click={navigateToContainer}>
+      <StatusIcon status={getStatus()} icon={ContainerIcon}/>
+    </button>
+  {/if}
+{/key}
 
-{#if object.health === undefined}
-  <Spinner/>
-{:else}
-  <button on:click={navigateToContainer}>
-    <StatusIcon status={getStatus()} icon={ContainerIcon}/>
-  </button>
-{/if}
 

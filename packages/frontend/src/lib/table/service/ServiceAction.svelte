@@ -22,10 +22,12 @@ function deleteInferenceServer() {
 
 </script>
 
-{#if object.status === 'running'}
-  <ListItemButtonIcon icon="{faStop}" onClick="{stopInferenceServer}" title="Stop container" />
-{:else}
-  <ListItemButtonIcon icon="{faPlay}" onClick="{startInferenceServer}" title="Start container" />
-  <ListItemButtonIcon icon="{faTrash}" onClick="{deleteInferenceServer}" title="Delete container" />
-{/if}
+{#key object.status}
+  {#if object.status === 'running'}
+    <ListItemButtonIcon icon="{faStop}" onClick="{stopInferenceServer}" title="Stop container" />
+  {:else}
+    <ListItemButtonIcon icon="{faPlay}" onClick="{startInferenceServer}" title="Start container" />
+    <ListItemButtonIcon icon="{faTrash}" onClick="{deleteInferenceServer}" title="Delete container" />
+  {/if}
+{/key}
 
