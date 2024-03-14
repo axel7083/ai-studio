@@ -15,16 +15,20 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
+import type { ModelOptions } from './IModelOptions';
 
-export enum Messages {
-  MSG_PLAYGROUNDS_STATE_UPDATE = 'playgrounds-state-update',
-  MSG_NEW_PLAYGROUND_QUERIES_STATE = 'new-playground-queries-state',
-  MSG_NEW_CATALOG_STATE = 'new-catalog-state',
-  MSG_TASKS_UPDATE = 'tasks-update',
-  MSG_NEW_MODELS_STATE = 'new-models-state',
-  MSG_APPLICATIONS_STATE_UPDATE = 'applications-state-update',
-  MSG_LOCAL_REPOSITORY_UPDATE = 'local-repository-update',
-  MSG_INFERENCE_SERVERS_UPDATE = 'inference-servers-update',
-  MSG_SUPPORTED_LANGUAGES_UPDATE = 'supported-languages-supported',
-  MSG_CONVERSATIONS_UPDATE = 'conversations-update',
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+export interface UserChat {
+  role: 'user',
+  options?: ModelOptions,
+}
+
+export interface Conversation {
+  id: string;
+  messages: ChatMessage[];
 }
