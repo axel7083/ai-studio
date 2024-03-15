@@ -28,6 +28,7 @@ import type { InferenceServer } from './models/IInference';
 import type { CreationInferenceServerOptions } from './models/InferenceServerConfig';
 import type { ModelOptions } from './models/IModelOptions';
 import type { Conversation } from './models/IPlaygroundMessage';
+import type { StatsHistory } from '../../backend/src/managers/monitoringManager';
 
 export abstract class StudioAPI {
   abstract ping(): Promise<string>;
@@ -144,4 +145,9 @@ export abstract class StudioAPI {
    * Create a new conversation and return a conversationId
    */
   abstract createPlaygroundConversation(): Promise<string>;
+
+  /**
+   * Return all the stats history of the Monitoring Manager
+   */
+  abstract getStatsHistories(): Promise<StatsHistory[]>;
 }

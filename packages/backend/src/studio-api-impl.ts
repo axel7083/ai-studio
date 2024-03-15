@@ -41,6 +41,7 @@ import type { PlaygroundV2Manager } from './managers/playgroundV2Manager';
 import { getFreeRandomPort } from './utils/ports';
 import { withDefaultConfiguration } from './utils/inferenceUtils';
 import type { ModelOptions } from '@shared/src/models/IModelOptions';
+import type { MonitoringManager, StatsHistory } from './managers/monitoringManager';
 
 export class StudioApiImpl implements StudioAPI {
   constructor(
@@ -53,7 +54,13 @@ export class StudioApiImpl implements StudioAPI {
     private taskRegistry: TaskRegistry,
     private inferenceManager: InferenceManager,
     private playgroundV2: PlaygroundV2Manager,
-  ) {}
+    private monitoringManager: MonitoringManager,
+  ) {
+  }
+
+  async getStatsHistories(): Promise<StatsHistory[]> {
+    return this.monitoringManager.getStats();
+  }
 
   submitPlaygroundMessage(
     containerId: string,

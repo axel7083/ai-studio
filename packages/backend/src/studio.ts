@@ -40,6 +40,7 @@ import { PodmanConnection } from './managers/podmanConnection';
 import { LocalRepositoryRegistry } from './registries/LocalRepositoryRegistry';
 import { InferenceManager } from './managers/inference/inferenceManager';
 import { PlaygroundV2Manager } from './managers/playgroundV2Manager';
+import { MonitoringManager } from './managers/monitoringManager';
 
 // TODO: Need to be configured
 export const AI_STUDIO_FOLDER = path.join('podman-desktop', 'ai-studio');
@@ -151,12 +152,15 @@ export class Studio {
       localRepositoryRegistry,
     );
 
+    const monitoringManager = new MonitoringManager(this.#panel.webview);
+
     this.#inferenceManager = new InferenceManager(
       this.#panel.webview,
       containerRegistry,
       podmanConnection,
       this.modelsManager,
       this.telemetry,
+      monitoringManager,
     );
 
     this.#panel.onDidChangeViewState((e: WebviewPanelOnDidChangeViewStateEvent) => {
@@ -182,6 +186,7 @@ export class Studio {
       taskRegistry,
       this.#inferenceManager,
       playgroundV2,
+      monitoringManager,
     );
 
     this.catalogManager.init();

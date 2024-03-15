@@ -36,6 +36,7 @@ import { Publisher } from '../../utils/Publisher';
 import { Messages } from '@shared/Messages';
 import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import type { ModelsManager } from '../modelsManager';
+import type { MonitoringManager } from '../monitoringManager';
 
 export class InferenceManager extends Publisher<InferenceServer[]> implements Disposable {
   // Inference server map (containerId -> InferenceServer)
@@ -51,6 +52,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
     private podmanConnection: PodmanConnection,
     private modelsManager: ModelsManager,
     private telemetry: TelemetryLogger,
+    private monitoringManager: MonitoringManager,
   ) {
     super(webview, Messages.MSG_INFERENCE_SERVERS_UPDATE, () => this.getServers());
     this.#servers = new Map<string, InferenceServer>();
@@ -187,6 +189,12 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
 
     // Create a pulling update for container health check
     const intervalId = setInterval(this.updateServerStatus.bind(this, engineId, containerId), 10000);
+
+    this.monitoringManager.monitor(containerId, engineId).then((disposable) => {
+      this.#disposables.push(disposable);
+    }).catch((err: unknown) => {
+      console.error(`Something went wrong while trying to monitore container ${containerId}.`, err);
+    });
 
     this.#disposables.push(
       Disposable.create(() => {

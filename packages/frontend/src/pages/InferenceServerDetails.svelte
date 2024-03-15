@@ -6,6 +6,7 @@ import ServiceAction from '/@/lib/table/service/ServiceAction.svelte';
 import Fa from 'svelte-fa';
 import { faBuildingColumns, faCopy, faMicrochip, faScaleBalanced } from '@fortawesome/free-solid-svg-icons';
 import type { InferenceServer } from '@shared/src/models/IInference';
+import MemoryHistogram from '/@/lib/MemoryHistogram.svelte';
 
 export let containerId: string | undefined = undefined;
 
@@ -19,6 +20,10 @@ $: service = $inferenceServers.find(server => server.container.containerId === c
       <div class="min-w-full min-h-full flex-1">
         <div class="mt-4 px-5 space-y-5 h-full">
           {#if service !== undefined}
+
+            <!-- showing the memory histogram -->
+            <MemoryHistogram containerId={service.container.containerId} />
+
             <!-- container details -->
             <div class="bg-charcoal-800 rounded-md w-full px-4 pt-2 pb-4">
               <!-- container info -->
