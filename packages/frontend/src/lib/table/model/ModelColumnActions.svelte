@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
-import { faDownload, faRocket, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faFileArrowUp, faRocket, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { faFolderOpen } from '@fortawesome/free-solid-svg-icons';
 import ListItemButtonIcon from '../../button/ListItemButtonIcon.svelte';
 import { studioClient } from '/@/utils/client';
@@ -31,6 +31,12 @@ function createModelService() {
   router.goto('/service/create');
   router.location.query.replace({ 'model-id': object.id });
 }
+
+function uploadModel() {
+  studioClient.uploadModel(object.id).catch((err: unknown) => {
+    console.error('Something went wrong while trying to upload model', err);
+  })
+}
 </script>
 
 {#if object.file !== undefined}
@@ -39,6 +45,11 @@ function createModelService() {
     title="Create Model Service"
     enabled="{!object.state}"
     onClick="{() => createModelService()}" />
+  <ListItemButtonIcon
+    icon="{faFileArrowUp}"
+    title="Upload model to Podman Machine"
+    enabled="{!object.state}"
+    onClick="{() => uploadModel()}" />
   <ListItemButtonIcon
     icon="{faFolderOpen}"
     onClick="{() => openModelFolder()}"

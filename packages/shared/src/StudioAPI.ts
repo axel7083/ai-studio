@@ -75,6 +75,12 @@ export abstract class StudioAPI {
   abstract downloadModel(modelId: string): Promise<void>;
 
   /**
+   * Copy model to podman machine if supported by system
+   * @param modelId the id of the model we want to upload
+   */
+  abstract uploadModel(modelId: string): Promise<void>;
+
+  /**
    * Get inference servers
    */
   abstract getInferenceServers(): Promise<InferenceServer[]>;

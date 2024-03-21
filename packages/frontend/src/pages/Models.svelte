@@ -26,7 +26,7 @@ const columns: Column<ModelInfo>[] = [
   new Column<ModelInfo>('HW Compat', { width: '1fr', renderer: ModelColumnHw }),
   new Column<ModelInfo>('Registry', { width: '2fr', renderer: ModelColumnRegistry }),
   new Column<ModelInfo>('License', { width: '2fr', renderer: ModelColumnLicense }),
-  new Column<ModelInfo>('Actions', { align: 'right', width: '120px', renderer: ModelColumnActions }),
+  new Column<ModelInfo>('Actions', { align: 'right', width: '160px', renderer: ModelColumnActions }),
 ];
 const row = new Row<ModelInfo>({});
 
@@ -58,15 +58,19 @@ onMount(() => {
     // Filter out duplicates
     const modelIds = new Set<string>();
     pullingTasks = value.reduce((filtered: Task[], task: Task) => {
-      if (
-        task.state === 'loading' &&
-        task.labels !== undefined &&
-        'model-pulling' in task.labels &&
-        !modelIds.has(task.labels['model-pulling'])
-      ) {
-        modelIds.add(task.labels['model-pulling']);
-        filtered.push(task);
+
+      if(task.state === 'loading' && task.labels !== undefined) {
+        if('model-pulling' in task.labels && !modelIds.has(task.labels['model-pulling'])) {
+          modelIds.add(task.labels['model-pulling']);
+          filtered.push(task);
+        }
+
+        if('model-uploading' in task.labels && !modelIds.has(task.labels['model-uploading'])) {
+          modelIds.add(task.labels['model-uploading']);
+          filtered.push(task);
+        }
       }
+
       return filtered;
     }, []);
 

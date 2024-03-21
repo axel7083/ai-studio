@@ -356,6 +356,16 @@ export class StudioApiImpl implements StudioAPI {
     });
   }
 
+  async uploadModel(modelId: string): Promise<void> {
+    const modelInfo: ModelInfo = this.modelsManager.getModelInfo(modelId);
+    if(modelInfo.file === undefined)
+      throw new Error('model should be downloaded before upload.');
+
+    this.modelsManager.uploadModelToPodmanMachine(modelInfo, path.resolve(modelInfo.file.path, modelInfo.file.file)).catch((err: unknown) => {
+      console.error('Something went wrong while trying to upload to podman machine.', err);
+    });
+  }
+
   getHostFreePort(): Promise<number> {
     return getFreeRandomPort('0.0.0.0');
   }
