@@ -20,7 +20,7 @@ import type { ContainerAttachedInfo, ImageInfo, ApplicationPodInfo } from './app
 import { LABEL_RECIPE_ID, ApplicationManager } from './applicationManager';
 import type { GitManager } from './gitManager';
 import os from 'os';
-import fs from 'node:fs';
+import fs, { type PathLike } from 'node:fs';
 import type { Recipe } from '@shared/src/models/IRecipe';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
 import { ModelsManager } from './modelsManager';
@@ -166,28 +166,30 @@ describe('pullApplication', () => {
   function mockForPullApplication(options: mockForPullApplicationOptions) {
     vi.spyOn(os, 'homedir').mockReturnValue('/home/user');
     vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
-    vi.spyOn(fs, 'existsSync').mockImplementation((path: string) => {
-      if (path.endsWith('recipe1')) {
+    vi.spyOn(fs, 'existsSync').mockImplementation((path: PathLike) => {
+      const strPath = `${path}`;
+      if (strPath.endsWith('recipe1')) {
         return options.recipeFolderExists;
-      } else if (path.endsWith('ai-lab.yaml')) {
+      } else if (strPath.endsWith('ai-lab.yaml')) {
         return true;
-      } else if (path.endsWith('contextdir1')) {
+      } else if (strPath.endsWith('contextdir1')) {
         return true;
       }
       return false;
     });
-    vi.spyOn(fs, 'statSync').mockImplementation((path: string) => {
-      if (path.endsWith('recipe1')) {
+    vi.spyOn(fs, 'statSync').mockImplementation((path: PathLike) => {
+      const strPath = `${path}`;
+      if (strPath.endsWith('recipe1')) {
         const stat = new fs.Stats();
         stat.isDirectory = () => true;
         return stat;
-      } else if (path.endsWith('ai-lab.yaml')) {
+      } else if (strPath.endsWith('ai-lab.yaml')) {
         const stat = new fs.Stats();
         stat.isDirectory = () => false;
         return stat;
       }
     });
-    vi.spyOn(fs, 'readFileSync').mockImplementation((_path: string) => {
+    vi.spyOn(fs, 'readFileSync').mockImplementation((_path, _options) => {
       return '';
     });
     mocks.parseYamlFileMock.mockReturnValue({

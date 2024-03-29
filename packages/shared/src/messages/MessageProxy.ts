@@ -39,7 +39,7 @@ export interface ISubscribedMessage {
   body: any;
 }
 
-type UnaryRPC = (...args: unknown[]) => Promise<unknown>;
+type UnaryRPC = (...args: any[]) => Promise<unknown>;
 
 export function isMessageRequest(content: unknown): content is IMessageRequest {
   return !!content && typeof content === 'object' && 'id' in content && 'channel' in content;
