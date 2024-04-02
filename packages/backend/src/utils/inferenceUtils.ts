@@ -33,8 +33,7 @@ export const SECOND: number = 1_000_000_000;
 
 export const LABEL_INFERENCE_SERVER: string = 'ai-lab-inference-server';
 
-export const INFERENCE_SERVER_IMAGE =
-  'ghcr.io/containers/podman-desktop-extension-ai-lab-playground-images/ai-lab-playground-chat:0.2.0';
+export const INFERENCE_SERVER_IMAGE = 'quay.io/ai-lab/llamacpp-python:latest';
 
 /**
  * Return container connection provider
@@ -147,7 +146,7 @@ export function generateContainerCreateOptions(
       ...config.labels,
       [LABEL_INFERENCE_SERVER]: JSON.stringify(config.modelsInfo.map(model => model.id)),
     },
-    Env: [`MODEL_PATH=/models/${modelInfo.file.file}`],
+    Env: [`MODEL_PATH=/models/${modelInfo.file.file}`, 'PORT=8000', 'HOST=0.0.0.0'],
     Cmd: ['--models-path', '/models', '--context-size', '700', '--threads', '4'],
   };
 }
