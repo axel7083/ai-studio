@@ -23,7 +23,7 @@ import {
   type PullEvent,
   type ProviderContainerConnection,
   type ImageInfo,
-  type ListImagesOptions,
+  type ListImagesOptions, env,
 } from '@podman-desktop/api';
 import type { CreationInferenceServerOptions, InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import { DISABLE_SELINUX_LABEL_SECURITY_OPTION } from './utils';
@@ -76,8 +76,11 @@ export async function getImageInfo(
 ): Promise<ImageInfo> {
   let imageInfo: ImageInfo;
   try {
-    // Pull image
-    await containerEngine.pullImage(connection, image, callback);
+    if(!image.startsWith('localhost')) {
+      // Pull image
+      await containerEngine.pullImage(connection, image, callback);
+    }
+
     // Get image inspect
     imageInfo = (
       await containerEngine.listImages({
@@ -115,7 +118,7 @@ export function generateContainerCreateOptions(
     throw new Error('The model info file provided is undefined');
   }
 
-  return {
+  const options: ContainerCreateOptions = {
     Image: imageInfo.Id,
     Detach: true,
     ExposedPorts: { [`${config.port}`]: {} },
@@ -147,9 +150,51 @@ export function generateContainerCreateOptions(
       ...config.labels,
       [LABEL_INFERENCE_SERVER]: JSON.stringify(config.modelsInfo.map(model => model.id)),
     },
-    Env: [`MODEL_PATH=/models/${modelInfo.file.file}`],
-    Cmd: ['--models-path', '/models', '--context-size', '700', '--threads', '4'],
+    Env: [`MODEL_PATH=/models/${modelInfo.file.file}`, 'HOST=0.0.0.0', 'PORT=8000'],
   };
+
+
+  if(config.gpu) {
+    if(!env.isWindows) throw new Error('Only Windows is supported for GPU acceleration');
+
+    options.Env.push(`GPU_LAYERS=${config.gpu.layers}`);
+
+    // disable GGML_CUDA_NO_PINNED (WSL2 issue)
+    // see https://github.com/ggerganov/llama.cpp/issues/1230#issuecomment-1575097730
+    options.Env.push('GGML_CUDA_NO_PINNED=1');
+
+    // mount WSL libs
+    options.HostConfig.Mounts.push({
+      Target: '/usr/lib/wsl',
+      Source: '/usr/lib/wsl',
+      Type: 'bind',
+    });
+
+    // GPU access in WSL happens through a /dev/dxg device, which routes GPU calls out to the Windows GPU.
+    // This setup is different than a traditional Linux set up.
+    options.HostConfig.Devices = [{
+      PathOnHost: '/dev/dxg',
+      PathInContainer: '/dev/dxg',
+      CgroupPermissions: 'rwm',
+    }];
+
+    // request GPU access
+    options.HostConfig.DeviceRequests = [{
+      Capabilities: [['gpu']],
+      Count: -1, // -1: all
+    }];
+
+    // we need to be root to chmod the run.sh script
+    options.User = 'root';
+
+    options.Entrypoint = '/usr/bin/sh';
+    options.Cmd = [
+      '-c',
+      '/usr/bin/ln -sf /usr/lib/wsl/lib/* /usr/lib64/ && PATH="${PATH}:/usr/lib/wsl/lib/" && chmod 755 ./run.sh && ./run.sh',
+    ];
+  }
+
+  return options;
 }
 
 export async function withDefaultConfiguration(
@@ -163,5 +208,6 @@ export async function withDefaultConfiguration(
     labels: options.labels || {},
     modelsInfo: options.modelsInfo,
     providerId: options.providerId,
+    gpu: options.gpu,
   };
 }

@@ -19,6 +19,10 @@ import type { ModelInfo } from './IModelInfo';
 
 export type CreationInferenceServerOptions = Partial<InferenceServerConfig> & { modelsInfo: ModelInfo[] };
 
+export interface GPUConfig {
+  layers: number
+}
+
 export interface InferenceServerConfig {
   /**
    * Port to expose
@@ -41,4 +45,10 @@ export interface InferenceServerConfig {
    * Model info for the models
    */
   modelsInfo: ModelInfo[];
+
+  /**
+   * gpu configuration details
+   * @experimental
+   */
+  gpu?: GPUConfig
 }
