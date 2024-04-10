@@ -11,6 +11,7 @@ import type { LanguageVariant } from 'postman-code-generators';
 import { studioClient } from '/@/utils/client';
 import { onMount } from 'svelte';
 import { router } from 'tinro';
+import MonacoEditor from '/@/lib/monaco/MonacoEditor.svelte';
 
 export let containerId: string | undefined = undefined;
 
@@ -148,7 +149,7 @@ onMount(() => {
             </div>
 
             <!-- code client -->
-            <div>
+            <div class="mb-2">
               <div class="flex flex-row">
                 <span class="text-base grow">Client code</span>
 
@@ -184,9 +185,7 @@ onMount(() => {
 
               {#if snippet !== undefined}
                 <div class="bg-charcoal-900 rounded-md w-full p-4 mt-2">
-                  <code class="whitespace-break-spaces text-sm">
-                    {snippet}
-                  </code>
+                  <MonacoEditor content="{snippet}" language="{selectedLanguage.toLowerCase()}" />
                 </div>
               {/if}
             </div>
