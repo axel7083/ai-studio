@@ -7,6 +7,7 @@ import { localRepositories } from '../stores/localRepositories';
 import { findLocalRepositoryByRecipeId } from '/@/utils/localRepositoriesUtils';
 import type { LocalRepository } from '@shared/src/models/ILocalRepository';
 import RecipeStatus from '/@/lib/RecipeStatus.svelte';
+import HoverScroller from '/@/lib/label/HoverScroller.svelte';
 
 export let recipe: Recipe;
 
@@ -33,12 +34,9 @@ $: localPath = findLocalRepositoryByRecipeId($localRepositories, recipe.id);
     </div>
 
     {#if localPath}
-      <div
-        class="bg-charcoal-600 max-w-full rounded-md p-2 mb-2 flex flex-row w-min h-min text-xs text-nowrap items-center">
+      <div class="bg-charcoal-600 max-w-full rounded-md p-2 mb-2 flex flex-row w-min h-min text-xs text-nowrap items-center">
         <Fa class="mr-2" icon="{faFolder}" />
-        <span class="overflow-x-hidden text-ellipsis max-w-full">
-          {localPath.path}
-        </span>
+        <HoverScroller text="{localPath.path}"/>
       </div>
     {/if}
 
