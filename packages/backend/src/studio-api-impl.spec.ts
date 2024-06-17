@@ -97,6 +97,7 @@ vi.mock('@podman-desktop/api', async () => {
 let studioApiImpl: StudioApiImpl;
 let catalogManager: CatalogManager;
 let localRepositoryRegistry: LocalRepositoryRegistry;
+let applicationManager: ApplicationManager;
 
 beforeEach(async () => {
   vi.resetAllMocks();
@@ -111,6 +112,11 @@ beforeEach(async () => {
     } as unknown as Webview,
     appUserDirectory,
   );
+
+  applicationManager = {
+    removeApplication: mocks.deleteApplicationMock,
+    requestPullApplication: vi.fn(),
+  } as unknown as ApplicationManager;
 
   localRepositoryRegistry = new LocalRepositoryRegistry(
     {
@@ -127,9 +133,7 @@ beforeEach(async () => {
 
   // Creating StudioApiImpl
   studioApiImpl = new StudioApiImpl(
-    {
-      removeApplication: mocks.deleteApplicationMock,
-    } as unknown as ApplicationManager,
+    applicationManager,
     catalogManager,
     {} as ModelsManager,
     telemetryMock,
@@ -154,7 +158,7 @@ beforeEach(async () => {
   } as unknown as EventEmitter<unknown>);
 });
 
-test('expect pull application to call the withProgress api method', async () => {
+test('expect requestPullApplication to provide a tracking id', async () => {
   vi.spyOn(catalogManager, 'getRecipes').mockReturnValue([
     {
       id: 'recipe 1',
@@ -164,10 +168,11 @@ test('expect pull application to call the withProgress api method', async () => 
     id: 'model',
   } as unknown as ModelInfo);
 
-  mocks.withProgressMock.mockResolvedValue(undefined);
+  vi.mocked(applicationManager.requestPullApplication).mockResolvedValue('dummy-tracker');
 
-  await studioApiImpl.requestPullApplication('recipe 1', 'model1');
-  expect(mocks.withProgressMock).toHaveBeenCalledOnce();
+  const trackingId = await studioApiImpl.requestPullApplication('recipe 1', 'model1');
+  expect(applicationManager.requestPullApplication).toHaveBeenCalledOnce();
+  expect(trackingId).toBe('dummy-tracker');
 });
 
 test('requestRemoveApplication should ask confirmation', async () => {
