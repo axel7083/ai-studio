@@ -38,7 +38,7 @@ const config = {
   },
   build: {
     sourcemap: 'inline',
-    target: 'esnext',
+    target: 'node20',
     outDir: 'dist',
     assetsDir: '.',
     minify: process.env.MODE === 'production' ? 'esbuild' : false,
@@ -49,6 +49,7 @@ const config = {
     rollupOptions: {
       external: [
         '@podman-desktop/api',
+        '@kubernetes/client-node',
         ...builtinModules.flatMap(p => [p, `node:${p}`]),
       ],
       output: {

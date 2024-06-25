@@ -55,6 +55,7 @@
     "watch": "vite --mode development build -w"
   },
   "dependencies": {
+    "@kubernetes/client-node": "^0.21.0",
     "isomorphic-git": "^1.26.2",
     "mustache": "^4.2.0",
     "openai": "^4.52.0",

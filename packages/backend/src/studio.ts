@@ -44,6 +44,7 @@ import { PodManager } from './managers/recipes/PodManager';
 import { initWebview } from './webviewUtils';
 import { LlamaCppPython } from './workers/provider/LlamaCppPython';
 import { InferenceProviderRegistry } from './registries/InferenceProviderRegistry';
+import { KubeConfig } from '@kubernetes/client-node';
 
 export class Studio {
   readonly #extensionContext: ExtensionContext;
@@ -89,7 +90,13 @@ export class Studio {
   }
 
   public async activate(): Promise<void> {
-    console.log('starting AI Lab extension');
+    console.log('before creating KubeConfig');
+
+    const ctx = new KubeConfig();
+
+    console.log('after creating KubeConfig');
+
+
     this.#telemetry = env.createTelemetryLogger();
 
     /**
