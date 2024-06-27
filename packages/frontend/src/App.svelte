@@ -104,7 +104,7 @@ onMount(() => {
         {#if meta.params.id === 'create'}
           <CreateService />
         {:else}
-          <ServiceDetails containerId="{meta.params.id}" />
+          <ServiceDetails serverId="{meta.params.id}" />
         {/if}
       </Route>
     </div>
