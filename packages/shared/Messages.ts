@@ -28,5 +28,6 @@ export enum Messages {
   MSG_CONVERSATIONS_UPDATE = 'conversations-update',
   MSG_GPUS_UPDATE = 'gpus-update',
   MSG_INFERENCE_PROVIDER_UPDATE = 'inference-provider-update',
+  MSG_RECIPE_IMAGES_UPDATE = 'recipe-images-update'
   MSG_CONFIGURATION_UPDATE = 'configuration-update',
 }

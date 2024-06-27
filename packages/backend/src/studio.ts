@@ -48,6 +48,7 @@ import { InferenceServerRegistry } from './registries/InferenceServerRegistry';
 import { KubernetesInferenceManager } from './managers/inference/kubernetesInferenceManager';
 import { KubernetesLlamaCppPython } from './workers/provider/KubernetesLlamaCppPython';
 import { ConfigurationRegistry } from './registries/ConfigurationRegistry';
+import { RecipeManager } from './managers/recipes/RecipeManager';
 
 export class Studio {
   readonly #extensionContext: ExtensionContext;
@@ -80,6 +81,8 @@ export class Studio {
   #cancellationTokenRegistry: CancellationTokenRegistry | undefined;
   #snippetManager: SnippetManager | undefined;
   #playgroundManager: PlaygroundV2Manager | undefined;
+
+  #recipeManager: RecipeManager | undefined;
   #applicationManager: ApplicationManager | undefined;
   #inferenceProviderRegistry: InferenceProviderRegistry | undefined;
   #configurationRegistry: ConfigurationRegistry | undefined;
@@ -223,21 +226,27 @@ export class Studio {
     this.#localRepositoryRegistry.init();
     this.#extensionContext.subscriptions.push(this.#localRepositoryRegistry);
 
+    this.#recipeManager = new RecipeManager(
+      this.#panel.webview,
+      appUserDirectory,
+      gitManager,
+      this.#taskRegistry,
+      this.#builderManager,
+      this.#localRepositoryRegistry,
+    );
+
     /**
      * The application manager is managing the Recipes
      */
     this.#applicationManager = new ApplicationManager(
-      appUserDirectory,
-      gitManager,
       this.#taskRegistry,
       this.#panel.webview,
       this.#podmanConnection,
       this.#catalogManager,
       this.#modelsManager,
       this.#telemetry,
-      this.#localRepositoryRegistry,
-      this.#builderManager,
       this.#podManager,
+      this.#recipeManager,
     );
     this.#applicationManager.init();
     this.#extensionContext.subscriptions.push(this.#applicationManager);
@@ -321,6 +330,7 @@ export class Studio {
       this.#playgroundManager,
       this.#snippetManager,
       this.#cancellationTokenRegistry,
+      this.#recipeManager,
       this.#configurationRegistry,
     );
     // Register the instance
