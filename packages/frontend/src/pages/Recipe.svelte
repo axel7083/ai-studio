@@ -1,6 +1,7 @@
 <script lang="ts">
 import { studioClient } from '/@/utils/client';
-import { DetailsPage } from '@podman-desktop/ui-svelte';
+import { Tab, DetailsPage } from '@podman-desktop/ui-svelte';
+import Route from '/@/Route.svelte';
 import Card from '/@/lib/Card.svelte';
 import MarkdownRenderer from '/@/lib/markdown/MarkdownRenderer.svelte';
 import { getIcon } from '/@/utils/categoriesUtils';
@@ -11,10 +12,13 @@ import { router } from 'tinro';
 import { faRocket } from '@fortawesome/free-solid-svg-icons';
 import { Button } from '@podman-desktop/ui-svelte';
 import Fa from 'svelte-fa';
+import RecipeImages from '/@/pages/RecipeImages.svelte';
+import type { Recipe } from '@shared/src/models/IRecipe';
 
 export let recipeId: string;
 
 // The recipe model provided
+let recipe: Recipe | undefined = undefined;
 $: recipe = $catalog.recipes.find(r => r.id === recipeId);
 $: categories = $catalog.categories;
 
@@ -42,19 +46,30 @@ export function goToUpPage(): void {
       <Fa size="1.125x" class="text-[var(--pd-content-header-icon)]" icon="{getIcon(recipe?.icon)}" />
     </div>
   </svelte:fragment>
+  <svelte:fragment slot="tabs">
+    <Tab title="Summary" url="/recipe/{recipeId}" selected="{$router.path === `/recipe/${recipeId}`}" />
+    <Tab title="Images" url="/recipe/{recipeId}/images" selected="{$router.path === `/recipe/${recipeId}/images`}" />
+  </svelte:fragment>
   <svelte:fragment slot="actions">
     <Button on:click="{() => router.goto(`/recipe/${recipeId}/start`)}" icon="{faRocket}" aria-label="Start recipe"
       >Start</Button>
   </svelte:fragment>
   <svelte:fragment slot="content">
-    <ContentDetailsLayout detailsTitle="AI App Details" detailsLabel="application details">
-      <svelte:fragment slot="content">
-        <MarkdownRenderer source="{recipe?.readme}" />
-      </svelte:fragment>
-      <svelte:fragment slot="details">
-        <RecipeDetails recipeId="{recipeId}" />
-      </svelte:fragment>
-    </ContentDetailsLayout>
+    <Route path="/">
+      <ContentDetailsLayout detailsTitle="AI App Details" detailsLabel="application details">
+        <svelte:fragment slot="content">
+          <MarkdownRenderer source="{recipe?.readme}" />
+        </svelte:fragment>
+        <svelte:fragment slot="details">
+          <RecipeDetails recipeId="{recipeId}" />
+        </svelte:fragment>
+      </ContentDetailsLayout>
+    </Route>
+    <Route path="/images">
+      {#if recipe}
+        <RecipeImages recipe="{recipe}"/>
+      {/if}
+    </Route>
   </svelte:fragment>
   <svelte:fragment slot="subtitle">
     <div class="mt-2">

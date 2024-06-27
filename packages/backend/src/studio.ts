@@ -226,6 +226,9 @@ export class Studio {
     this.#localRepositoryRegistry.init();
     this.#extensionContext.subscriptions.push(this.#localRepositoryRegistry);
 
+    /**
+     * The recipe manager is responsible for the operation on recipes (E.g. clone, build.)
+     */
     this.#recipeManager = new RecipeManager(
       this.#panel.webview,
       appUserDirectory,
@@ -234,6 +237,8 @@ export class Studio {
       this.#builderManager,
       this.#localRepositoryRegistry,
     );
+    this.#recipeManager.init();
+    this.#extensionContext.subscriptions.push(this.#recipeManager);
 
     /**
      * The application manager is managing the Recipes
