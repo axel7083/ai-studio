@@ -81,6 +81,7 @@ export class KubernetesLlamaCppPython extends KubernetesInferenceProvider {
         ],
         containers: [
           {
+            // using imagePullPolicy: 'Always', to always repull the recipe
             livenessProbe: {
               httpGet: {
                 port: 8000,

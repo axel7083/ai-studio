@@ -17,14 +17,18 @@ const columns = [
   new TableColumn<RecipeImage, string>('Name', {
     width: '3fr',
     renderer: TableSimpleColumn,
-    renderMapping: (object) => object.id,
+    renderMapping: (object) => object.name ?? object.id,
   }),
 ];
 const row = new TableRow<RecipeImage>({});
 </script>
 
-{#if images.length > 0}
-  <Table kind="model" data="{images}" columns="{columns}" row="{row}"></Table>
-{:else}
-  <div role="status" class="text-[var(--pd-content-text)]">There are no images yet. Build the recipe to see the corresponding image here.</div>
-{/if}
+<div class="flex flex-col w-full bg-[var(--pd-content-bg)] h-full">
+  <div class="overflow-y-scroll">
+    {#if images.length > 0}
+      <Table kind="model" data="{images}" columns="{columns}" row="{row}"></Table>
+    {:else}
+      <div role="status" class="text-[var(--pd-content-text)]">There are no images yet. Build the recipe to see the corresponding image here.</div>
+    {/if}
+  </div>
+</div>

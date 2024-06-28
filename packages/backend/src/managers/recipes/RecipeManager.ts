@@ -80,6 +80,7 @@ export class RecipeManager extends Publisher<RecipeImage[]> implements Disposabl
     images.filter(image => IMAGE_LABEL_RECIPE_ID in image.Labels).map(image => ({
       recipeId: image.Labels[IMAGE_LABEL_RECIPE_ID],
       id: image.Id,
+      name: (image.RepoTags && image.RepoTags.length > 0)?image.RepoTags[0]:undefined,
       modelService: IMAGE_LABEL_MODEL_SERVICE in image.Labels && image.Labels[IMAGE_LABEL_MODEL_SERVICE] === 'true',
       appName:  image.Labels[IMAGE_LABEL_APPLICATION_NAME],
     } as RecipeImage)).forEach(recipeImage => this.#images.set(recipeImage.id, recipeImage));
