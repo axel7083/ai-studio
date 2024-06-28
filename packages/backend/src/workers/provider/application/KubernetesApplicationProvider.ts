@@ -24,7 +24,11 @@ import type { TaskRegistry } from '../../../registries/TaskRegistry';
 import { InferenceType, RuntimeType } from '@shared/src/models/IInference';
 import { getRandomString } from '../../../utils/randomUtils';
 import { DEFAULT_NAMESPACE, getCoreV1Api, getLabels } from '../../../registries/KubernetesPodRegistry';
-import { POD_LABEL_MODEL_ID, POD_LABEL_RECIPE_ID } from '../../../utils/RecipeConstants';
+import {
+  POD_LABEL_LOCAL_PORT,
+  POD_LABEL_MODEL_ID,
+  POD_LABEL_RECIPE_ID,
+} from '../../../utils/RecipeConstants';
 import { AI_LAB_SERVICE_INFERENCE_LABEL } from '../../../managers/inference/kubernetesInferenceManager';
 import type { InferenceProviderRegistry } from '../../../registries/InferenceProviderRegistry';
 import { getInferenceType } from '../../../utils/inferenceUtils';
@@ -53,11 +57,12 @@ export class KubernetesApplicationProvider extends ApplicationProvider<V1Pod> {
     // first push the images to the registry
     await Promise.all(config.images.map(image => this.pushImage(image, config.labels ?? {})));
 
+    const inferenceLocalPort = await getFreeRandomPort('127.0.0.1');
     // creating inference server
     const modelService = config.images.find(image => image.modelService);
     const inferencePod = await provider.perform({
       labels: config.labels ?? {},
-      port: await getFreeRandomPort('127.0.0.1'),
+      port: inferenceLocalPort,
       image: modelService?.name,
       runtime: RuntimeType.KUBERNETES,
       modelsInfo: [config.model],
@@ -95,6 +100,13 @@ export class KubernetesApplicationProvider extends ApplicationProvider<V1Pod> {
       this.taskRegistry.updateTask(serviceTask);
     }
 
+    let localPort = await getFreeRandomPort('127.0.0.1');
+    // tentative
+    if(localPort === inferenceLocalPort) {
+      console.warn('getFreeRandomPort gave two time the same result.');
+      localPort += 1;
+    }
+
     const body: V1Pod = {
       metadata: {
         name: `podman-ai-lab-${config.recipe.name}-${getRandomString()}`.toLowerCase(),
@@ -102,6 +114,7 @@ export class KubernetesApplicationProvider extends ApplicationProvider<V1Pod> {
         annotations: {
           [POD_LABEL_RECIPE_ID]: config.recipe.id,
           [POD_LABEL_MODEL_ID]: config.model.id,
+          [POD_LABEL_LOCAL_PORT]: `${localPort}`,
         },
       },
       spec: {

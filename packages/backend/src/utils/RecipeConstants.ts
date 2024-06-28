@@ -23,6 +23,7 @@ export const POD_LABEL_RECIPE_ID = 'ai-lab-recipe-id';
 export const POD_LABEL_MODEL_ID = 'ai-lab-model-id';
 export const POD_LABEL_MODEL_PORTS = 'ai-lab-model-ports';
 export const POD_LABEL_APP_PORTS = 'ai-lab-application-ports';
+export const POD_LABEL_LOCAL_PORT = 'ai-lab-application-local-port';
 
 // image labels
 export const IMAGE_LABEL_RECIPE_ID = 'ai-lab-recipe-id';
