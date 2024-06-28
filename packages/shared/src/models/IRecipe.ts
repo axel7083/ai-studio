@@ -15,6 +15,24 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
+import type { RuntimeType } from './IInference';
+
+export interface StartRecipeConfig {
+  runtime: RuntimeType,
+  recipeId: string,
+  modelId: string,
+}
+
+export interface RecipeImage {
+  id: string;
+  engineId: string;
+  name?: string;
+  // recipe related
+  recipeId: string;
+  modelService: boolean;
+  ports: string[];
+  appName: string;
+}
 
 export interface Recipe {
   id: string;

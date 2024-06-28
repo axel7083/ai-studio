@@ -20,9 +20,8 @@
 
 import { beforeEach, expect, test, vi, describe } from 'vitest';
 import content from './tests/ai-test.json';
-import type { ApplicationManager } from './managers/applicationManager';
+import type { PodmanApplicationManager } from './managers/applications/podmanApplicationManager';
 import { StudioApiImpl } from './studio-api-impl';
-import type { InferenceManager } from './managers/inference/inferenceManager';
 import type { ProviderContainerConnection, TelemetryLogger, Webview } from '@podman-desktop/api';
 import { window, EventEmitter, navigation } from '@podman-desktop/api';
 import { CatalogManager } from './managers/catalogManager';
@@ -38,6 +37,7 @@ import type { CancellationTokenRegistry } from './registries/CancellationTokenRe
 import path from 'node:path';
 import type { LocalModelImportInfo } from '@shared/src/models/ILocalModelInfo';
 import * as podman from './utils/podman';
+import type { InferenceServerRegistry } from './registries/InferenceServerRegistry';
 import type { ConfigurationRegistry } from './registries/ConfigurationRegistry';
 
 vi.mock('./ai.json', () => {
@@ -98,6 +98,7 @@ vi.mock('@podman-desktop/api', async () => {
 let studioApiImpl: StudioApiImpl;
 let catalogManager: CatalogManager;
 let localRepositoryRegistry: LocalRepositoryRegistry;
+let applicationManager: PodmanApplicationManager;
 
 beforeEach(async () => {
   vi.resetAllMocks();
@@ -112,6 +113,11 @@ beforeEach(async () => {
     } as unknown as Webview,
     appUserDirectory,
   );
+
+  applicationManager = {
+    removeApplication: mocks.deleteApplicationMock,
+    requestPullApplication: vi.fn(),
+  } as unknown as PodmanApplicationManager;
 
   localRepositoryRegistry = new LocalRepositoryRegistry(
     {
@@ -128,15 +134,13 @@ beforeEach(async () => {
 
   // Creating StudioApiImpl
   studioApiImpl = new StudioApiImpl(
-    {
-      removeApplication: mocks.deleteApplicationMock,
-    } as unknown as ApplicationManager,
+    applicationManager,
     catalogManager,
     {} as ModelsManager,
     telemetryMock,
     localRepositoryRegistry,
     {} as unknown as TaskRegistry,
-    {} as unknown as InferenceManager,
+    {} as unknown as InferenceServerRegistry,
     {} as unknown as PlaygroundV2Manager,
     {} as unknown as SnippetManager,
     {} as unknown as CancellationTokenRegistry,
@@ -156,7 +160,7 @@ beforeEach(async () => {
   } as unknown as EventEmitter<unknown>);
 });
 
-test('expect pull application to call the withProgress api method', async () => {
+test('expect requestStartRecipe to provide a tracking id', async () => {
   vi.spyOn(catalogManager, 'getRecipes').mockReturnValue([
     {
       id: 'recipe 1',
@@ -166,10 +170,11 @@ test('expect pull application to call the withProgress api method', async () => 
     id: 'model',
   } as unknown as ModelInfo);
 
-  mocks.withProgressMock.mockResolvedValue(undefined);
+  vi.mocked(applicationManager.requestStartRecipe).mockResolvedValue('dummy-tracker');
 
-  await studioApiImpl.pullApplication('recipe 1', 'model1');
-  expect(mocks.withProgressMock).toHaveBeenCalledOnce();
+  const trackingId = await studioApiImpl.requestPullApplication('recipe 1', 'model1');
+  expect(applicationManager.requestStartRecipe).toHaveBeenCalledOnce();
+  expect(trackingId).toBe('dummy-tracker');
 });
 
 test('requestRemoveApplication should ask confirmation', async () => {

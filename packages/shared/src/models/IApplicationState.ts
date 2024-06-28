@@ -1,3 +1,5 @@
+import type { RuntimeType } from './IInference';
+
 /**********************************************************************
  * Copyright (C) 2024 Red Hat, Inc.
  *
@@ -15,15 +17,16 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-
-import type { PodInfo } from '@podman-desktop/api';
-
 export type PodHealth = 'none' | 'starting' | 'healthy' | 'unhealthy';
 
-export interface ApplicationState {
+export type ApplicationStatus = 'stopped' | 'running' | 'deleting' | 'stopping' | 'error' | 'starting';
+
+export interface ApplicationInfo {
+  id: string;
+  runtime: RuntimeType,
+  status: ApplicationStatus;
   recipeId: string;
   modelId: string;
-  pod: PodInfo;
   appPorts: number[];
   modelPorts: number[];
   health: PodHealth;

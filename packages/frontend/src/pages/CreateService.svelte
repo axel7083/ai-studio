@@ -15,6 +15,7 @@ import ContainerConnectionStatusInfo from '../lib/notification/ContainerConnecti
 import type { ContainerConnectionInfo } from '@shared/src/models/IContainerConnectionInfo';
 import { checkContainerConnectionStatus } from '../utils/connectionUtils';
 import { Button, ErrorMessage, FormPage, Input } from '@podman-desktop/ui-svelte';
+import { RuntimeType } from '@shared/src/models/IInference';
 
 // List of the models available locally
 let localModels: ModelInfo[];
@@ -24,6 +25,8 @@ $: localModels = $modelsInfo.filter(model => model.file);
 let containerPort: number | undefined = undefined;
 // The modelId is the bind value to form input
 let modelId: string | undefined = undefined;
+// runtime used
+let runtime: RuntimeType = RuntimeType.PODMAN;
 // If the creation of a new inference service fail
 let errorMsg: string | undefined = undefined;
 
@@ -38,8 +41,8 @@ let error: boolean = false;
 
 // The containerId will be included in the tasks when the creation
 // process will be completed
-let containerId: string | undefined = undefined;
-$: available = containerId && $inferenceServers.some(server => server.container.containerId);
+let serverId: string | undefined = undefined;
+$: available = serverId && $inferenceServers.some(server => server.id === serverId);
 
 $: loading = trackingId !== undefined && !error;
 
@@ -72,6 +75,7 @@ const submit = async () => {
     trackingId = await studioClient.requestCreateInferenceServer({
       modelsInfo: [model],
       port: containerPort,
+      runtime: runtime,
     });
   } catch (err: unknown) {
     trackingId = undefined;
@@ -87,7 +91,7 @@ const openModelsPage = () => {
 
 // Navigate to the new created service
 const openServiceDetails = () => {
-  router.goto(`/service/${containerId}`);
+  router.goto(`/service/${serverId}`);
 };
 
 // Utility method to filter the tasks properly based on the tracking Id
@@ -105,10 +109,10 @@ const processTasks = (tasks: Task[]) => {
   // hint: we do not need to display them as the TasksProgress component will
   error = trackedTasks.find(task => task.error)?.error !== undefined;
 
-  const task: Task | undefined = trackedTasks.find(task => 'containerId' in (task.labels || {}));
+  const task: Task | undefined = trackedTasks.find(task => 'serverId' in (task.labels || {}));
   if (task === undefined) return;
 
-  containerId = task.labels?.['containerId'];
+  serverId = task.labels?.['serverId'];
 };
 
 onMount(async () => {
@@ -160,6 +164,20 @@ export function goToUpPage(): void {
       <!-- form -->
       <div class="bg-[var(--pd-content-card-bg)] m-5 space-y-6 px-8 sm:pb-6 xl:pb-8 rounded-lg h-fit">
         <div class="w-full">
+          <label for="model" class="pt-4 block mb-2 text-sm font-bold text-[var(--pd-content-card-header-text)]"
+            >Runtime</label>
+          <select
+            required
+            bind:value="{runtime}"
+            disabled="{loading}"
+            aria-label="Runtime select"
+            id="runtime-select"
+            class="border text-sm rounded-lg w-full focus:ring-purple-500 focus:border-purple-500 block p-2.5 bg-charcoal-900 border-charcoal-900 placeholder-gray-700 text-white"
+            name="runtime select">
+            <option class="my-1" value="{RuntimeType.PODMAN}">{RuntimeType.PODMAN}</option>
+            <option class="my-1" value="{RuntimeType.KUBERNETES}">{RuntimeType.KUBERNETES}</option>
+          </select>
+
           <!-- model input -->
           <label for="model" class="pt-4 block mb-2 text-sm font-bold text-[var(--pd-content-card-header-text)]"
             >Model</label>
@@ -207,7 +225,7 @@ export function goToUpPage(): void {
         {/if}
         <footer>
           <div class="w-full flex flex-col">
-            {#if containerId === undefined}
+            {#if serverId === undefined}
               <Button
                 title="Create service"
                 inProgress="{loading}"

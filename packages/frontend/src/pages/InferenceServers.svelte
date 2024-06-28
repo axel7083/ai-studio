@@ -1,5 +1,5 @@
 <script lang="ts">
-import type { InferenceServer } from '@shared/src/models/IInference';
+  import { type InferenceServerInfo, RuntimeType } from '@shared/src/models/IInference';
 import ServiceColumnName from '/@/lib/table/service/ServiceColumnName.svelte';
 import { inferenceServers } from '/@/stores/inferenceServers';
 import ServiceStatus from '/@/lib/table/service/ServiceStatus.svelte';
@@ -11,16 +11,23 @@ import { router } from 'tinro';
 import { onMount } from 'svelte';
 import { Button } from '@podman-desktop/ui-svelte';
 import { Table, TableColumn, TableRow, NavPage } from '@podman-desktop/ui-svelte';
+  import ColumnRuntime from '/@/lib/table/ColumnRuntime.svelte';
 
-const columns: TableColumn<InferenceServer>[] = [
-  new TableColumn<InferenceServer>('Status', { width: '70px', renderer: ServiceStatus, align: 'center' }),
-  new TableColumn<InferenceServer>('Name', { width: '1fr', renderer: ServiceColumnName, align: 'left' }),
-  new TableColumn<InferenceServer>('Model', { renderer: ServiceColumnModelName, align: 'left' }),
-  new TableColumn<InferenceServer>('Actions', { width: '80px', renderer: ServiceAction, align: 'right' }),
+const columns = [
+  new TableColumn<InferenceServerInfo>('Status', { width: '70px', renderer: ServiceStatus, align: 'center' }),
+  new TableColumn<InferenceServerInfo>('Name', { width: '1fr', renderer: ServiceColumnName, align: 'left' }),
+  new TableColumn<InferenceServerInfo, RuntimeType>('Runtime', {
+    width: '90px',
+    renderer: ColumnRuntime,
+    renderMapping: (object) => object.runtime,
+    align: 'left',
+  }),
+  new TableColumn<InferenceServerInfo>('Model', { renderer: ServiceColumnModelName, align: 'left' }),
+  new TableColumn<InferenceServerInfo>('Actions', { width: '80px', renderer: ServiceAction, align: 'right' }),
 ];
-const row = new TableRow<InferenceServer>({ selectable: _service => true });
+const row = new TableRow<InferenceServerInfo>({ selectable: _service => true });
 
-let data: (InferenceServer & { selected?: boolean })[];
+let data: (InferenceServerInfo & { selected?: boolean })[];
 
 onMount(() => {
   return inferenceServers.subscribe(items => {
@@ -32,9 +39,7 @@ let selectedItemsNumber: number;
 
 const deleteSelected = () => {
   studioClient
-    .requestDeleteInferenceServer(
-      ...data.filter(service => service.selected).map(service => service.container.containerId),
-    )
+    .requestDeleteInferenceServer(...data.filter(service => service.selected).map(service => service.id))
     .catch((err: unknown) => {
       console.error('Something went wrong while trying to delete inference server', err);
     });

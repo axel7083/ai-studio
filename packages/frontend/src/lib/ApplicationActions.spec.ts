@@ -38,7 +38,7 @@ vi.mock('../utils/client', async () => ({
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(studioClient.requestStopApplication).mockResolvedValue(undefined);
-  vi.mocked(studioClient.requestStartApplication).mockResolvedValue(undefined);
+  vi.mocked(studioClient.requestStartPodApplication).mockResolvedValue(undefined);
   vi.mocked(studioClient.requestRemoveApplication).mockResolvedValue(undefined);
   vi.mocked(studioClient.requestRestartApplication).mockResolvedValue(undefined);
   vi.mocked(studioClient.requestOpenApplication).mockResolvedValue(undefined);
@@ -125,7 +125,7 @@ describe('start action', () => {
     expect(startBtn).toBeDefined();
 
     await fireEvent.click(startBtn);
-    expect(studioClient.requestStartApplication).toHaveBeenCalledWith('dummy-recipe-id', 'dummy-model-id');
+    expect(studioClient.requestStartPodApplication).toHaveBeenCalledWith('dummy-recipe-id', 'dummy-model-id');
   });
 
   test('start action should be hidden when one container is not exited', async () => {

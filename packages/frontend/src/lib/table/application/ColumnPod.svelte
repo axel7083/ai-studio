@@ -1,9 +1,9 @@
 <script lang="ts">
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
+import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
 
-export let object: ApplicationState;
+export let object: ApplicationInfo;
 </script>
 
 <div class="text-sm text-[var(--pd-table-body-text)] overflow-hidden text-ellipsis">
-  {object.pod.Name}
+  {object.id}
 </div>

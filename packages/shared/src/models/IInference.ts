@@ -17,6 +17,11 @@
  ***********************************************************************/
 import type { ModelInfo } from './IModelInfo';
 
+export enum RuntimeType {
+  PODMAN = 'podman',
+  KUBERNETES = 'kubernetes',
+}
+
 export enum InferenceType {
   LLAMA_CPP = 'llama-cpp',
   WHISPER_CPP = 'whisper-cpp',
@@ -25,19 +30,16 @@ export enum InferenceType {
 
 export type InferenceServerStatus = 'stopped' | 'running' | 'deleting' | 'stopping' | 'error' | 'starting';
 
-export interface InferenceServer {
+export interface InferenceServerInfo {
+  id: string;
+
   /**
    * Supported models
    */
   models: ModelInfo[];
-  /**
-   * Container info
-   */
-  container: {
-    engineId: string;
-    containerId: string;
-  };
+
   connection: {
+    host: string;
     port: number;
   };
   /**
@@ -65,4 +67,5 @@ export interface InferenceServer {
    * The type of inference server (aka backend)
    */
   type: InferenceType;
+  runtime: RuntimeType;
 }

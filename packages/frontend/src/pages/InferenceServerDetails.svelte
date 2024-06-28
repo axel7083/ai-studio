@@ -3,8 +3,15 @@ import { inferenceServers } from '/@/stores/inferenceServers';
 import ServiceStatus from '/@/lib/table/service/ServiceStatus.svelte';
 import ServiceAction from '/@/lib/table/service/ServiceAction.svelte';
 import Fa from 'svelte-fa';
-import { faBuildingColumns, faCheck, faCopy, faMicrochip, faScaleBalanced } from '@fortawesome/free-solid-svg-icons';
-import type { InferenceServer } from '@shared/src/models/IInference';
+import {
+  faArrowUpRightFromSquare,
+  faBuildingColumns,
+  faCheck,
+  faCopy,
+  faMicrochip,
+  faScaleBalanced,
+} from '@fortawesome/free-solid-svg-icons';
+import { type InferenceServerInfo, InferenceType } from '@shared/src/models/IInference';
 import { snippetLanguages } from '/@/stores/snippetLanguages';
 import type { LanguageVariant } from 'postman-code-generators';
 import { studioClient } from '/@/utils/client';
@@ -13,9 +20,9 @@ import { router } from 'tinro';
 import Badge from '/@/lib/Badge.svelte';
 import { Button, DetailsPage } from '@podman-desktop/ui-svelte';
 
-export let containerId: string | undefined = undefined;
+export let serverId: string | undefined = undefined;
 
-let service: InferenceServer | undefined = undefined;
+let service: InferenceServerInfo | undefined = undefined;
 
 let selectedLanguage: string = 'curl';
 $: selectedLanguage;
@@ -110,7 +117,7 @@ function copySnippet(): void {
 
 onMount(() => {
   return inferenceServers.subscribe(servers => {
-    service = servers.find(server => server.container.containerId === containerId);
+    service = servers.find(server => server.id === serverId);
     if (!service) {
       router.goto('/services');
     }
@@ -139,7 +146,7 @@ export function goToUpPage(): void {
   <svelte:fragment slot="subtitle">
     <div class="flex gap-x-2 items-center">
       {#if service}
-        <span class="text-xs">{service.container.containerId}</span>
+        <span class="text-xs">{service.id}</span>
         {#each service.models as model}
           <Badge icon="{faMicrochip}" content="{model.hw}" background="bg-charcoal-700" />
         {/each}
@@ -191,10 +198,16 @@ export function goToUpPage(): void {
               <div class="bg-charcoal-800 rounded-md w-full px-4 pt-2 pb-4 mt-2">
                 <span class="text-sm">Server</span>
                 <div class="flex flex-row gap-4">
-                  <div
-                    class="bg-charcoal-600 rounded-md p-2 flex flex-row w-min h-min text-xs text-nowrap items-center">
-                    http://localhost:{service.connection.port}/v1
-                  </div>
+                  {#if service.status === 'running' && service.type === InferenceType.LLAMA_CPP}
+                    <button
+                      on:click="{() =>
+                        service &&
+                        studioClient.openURL(`http://${service.connection.host}:${service.connection.port}/docs`)}"
+                      class="bg-charcoal-600 rounded-md p-2 flex flex-row w-min h-min text-xs text-nowrap items-center underline">
+                      http://{service.connection.host}:{service.connection.port}/docs
+                      <Fa class="ml-2" icon="{faArrowUpRightFromSquare}" />
+                    </button>
+                  {/if}
 
                   <div
                     class="bg-charcoal-600 rounded-md p-2 flex flex-row w-min h-min text-xs text-nowrap items-center">

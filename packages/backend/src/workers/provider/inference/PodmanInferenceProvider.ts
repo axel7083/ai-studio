@@ -15,40 +15,23 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import type {
-  ContainerCreateOptions,
-  ContainerCreateResult,
-  Disposable,
-  ImageInfo,
-  PullEvent,
-} from '@podman-desktop/api';
+import type { ContainerCreateOptions, ContainerCreateResult, ImageInfo, PullEvent } from '@podman-desktop/api';
 import { containerEngine } from '@podman-desktop/api';
-import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
-import type { IWorker } from '../IWorker';
-import type { TaskRegistry } from '../../registries/TaskRegistry';
-import { getImageInfo, getProviderContainerConnection } from '../../utils/inferenceUtils';
-import type { InferenceType } from '@shared/src/models/IInference';
+import type { TaskRegistry } from '../../../registries/TaskRegistry';
+import { getImageInfo, getProviderContainerConnection } from '../../../utils/inferenceUtils';
+import { type InferenceType, RuntimeType } from '@shared/src/models/IInference';
+import { InferenceProvider } from './InferenceProvider';
 
 export type BetterContainerCreateResult = ContainerCreateResult & { engineId: string };
 
-export abstract class InferenceProvider
-  implements IWorker<InferenceServerConfig, BetterContainerCreateResult>, Disposable
-{
-  readonly type: InferenceType;
-  readonly name: string;
-
+export abstract class PodmanInferenceProvider extends InferenceProvider<BetterContainerCreateResult> {
   protected constructor(
     private taskRegistry: TaskRegistry,
     type: InferenceType,
     name: string,
   ) {
-    this.type = type;
-    this.name = name;
+    super(RuntimeType.PODMAN, type, name);
   }
-
-  abstract enabled(): boolean;
-  abstract perform(config: InferenceServerConfig): Promise<BetterContainerCreateResult>;
-  abstract dispose(): void;
 
   protected async createContainer(
     engineId: string,

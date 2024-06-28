@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applicationStates } from '../stores/application-states';
+import { applicationInfos } from '../stores/application-infos';
 import ColumnActions from '../lib/table/application/ColumnActions.svelte';
 import ColumnStatus from '../lib/table/application/ColumnStatus.svelte';
 import ColumnRecipe from '../lib/table/application/ColumnRecipe.svelte';
@@ -8,32 +8,41 @@ import ColumnPod from '../lib/table/application/ColumnPod.svelte';
 import ColumnAge from '../lib/table/application/ColumnAge.svelte';
 import { router } from 'tinro';
 import { onMount } from 'svelte';
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
 import { Table, TableColumn, TableRow, NavPage } from '@podman-desktop/ui-svelte';
+import TasksBanner from '/@/lib/progress/TasksBanner.svelte';
+import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
+import type { RuntimeType } from '@shared/src/models/IInference';
+import ColumnRuntime from '/@/lib/table/ColumnRuntime.svelte';
 
-const columns: TableColumn<ApplicationState>[] = [
-  new TableColumn<ApplicationState>('Status', { width: '70px', align: 'center', renderer: ColumnStatus }),
-  new TableColumn<ApplicationState>('Model', { width: '3fr', renderer: ColumnModel }),
-  new TableColumn<ApplicationState>('Recipe', { width: '2fr', renderer: ColumnRecipe }),
-  new TableColumn<ApplicationState>('Pod', { width: '3fr', renderer: ColumnPod }),
-  new TableColumn<ApplicationState>('Age', { width: '2fr', renderer: ColumnAge }),
-  new TableColumn<ApplicationState>('Actions', {
+const columns = [
+  new TableColumn<ApplicationInfo>('Status', { width: '70px', align: 'center', renderer: ColumnStatus }),
+  new TableColumn<ApplicationInfo>('Model', { width: '3fr', renderer: ColumnModel }),
+  new TableColumn<ApplicationInfo>('Recipe', { width: '2fr', renderer: ColumnRecipe }),
+  new TableColumn<ApplicationInfo>('Pod', { width: '3fr', renderer: ColumnPod }),
+  new TableColumn<ApplicationInfo, RuntimeType>('Runtime', {
+    width: '90px',
+    renderer: ColumnRuntime,
+    renderMapping: (object) => object.runtime,
+    align: 'left',
+  }),
+  new TableColumn<ApplicationInfo>('Age', { width: '2fr', renderer: ColumnAge }),
+  new TableColumn<ApplicationInfo>('Actions', {
     align: 'right',
     width: '120px',
     renderer: ColumnActions,
     overflow: true,
   }),
 ];
-const row = new TableRow<ApplicationState>({});
+const row = new TableRow<ApplicationInfo>({});
 
 const openApplicationCatalog = () => {
   router.goto('/recipes');
 };
 
-let data: (ApplicationState & { selected?: boolean })[];
+let data: (ApplicationInfo & { selected?: boolean })[];
 
 onMount(() => {
-  return applicationStates.subscribe(items => {
+  return applicationInfos.subscribe(items => {
     data = items;
   });
 });
@@ -43,6 +52,9 @@ onMount(() => {
   <div slot="content" class="flex flex-col min-w-full min-h-full">
     <div class="min-w-full min-h-full flex-1">
       <div class="mt-4 px-5 space-y-5">
+        <!-- showing running tasks -->
+        <TasksBanner title="Pulling recipes" labels="{['recipe-pulling']}" />
+
         {#if data?.length > 0}
           <Table kind="AI App" data="{data}" columns="{columns}" row="{row}"></Table>
         {:else}

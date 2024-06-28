@@ -16,25 +16,21 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import '@testing-library/jest-dom/vitest';
-import { test, expect } from 'vitest';
-import { screen, render } from '@testing-library/svelte';
-import ModelColumnRecipeRecommended from './ModelColumnRecipeRecommended.svelte';
+import type { Readable } from 'svelte/store';
+import { readable } from 'svelte/store';
+import { Messages } from '@shared/Messages';
+import { rpcBrowser, studioClient } from '/@/utils/client';
+import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
 
-test('expect the star icon to be rendered whn recipe is recommended', async () => {
-  render(ModelColumnRecipeRecommended, {
-    object: true,
+export const applicationInfos: Readable<ApplicationInfo[]> = readable<ApplicationInfo[]>([], set => {
+  const sub = rpcBrowser.subscribe(Messages.MSG_APPLICATIONS_STATE_UPDATE, msg => {
+    set(msg);
   });
-
-  const starIcon = screen.getByTitle('Recommended model');
-  expect(starIcon).toBeInTheDocument();
-});
-
-test('expect nothing when recipe is NOT recommended', async () => {
-  render(ModelColumnRecipeRecommended, {
-    object: false,
+  // Initialize the store manually
+  studioClient.getApplicationInfo().then(state => {
+    set(state);
   });
-
-  const starIcon = screen.queryByTitle('Recommended model');
-  expect(starIcon).not.toBeInTheDocument();
+  return () => {
+    sub.unsubscribe();
+  };
 });

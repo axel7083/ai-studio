@@ -16,21 +16,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { Readable } from 'svelte/store';
-import { readable } from 'svelte/store';
+import { studioClient } from '/@/utils/client';
 import { Messages } from '@shared/Messages';
-import { rpcBrowser, studioClient } from '/@/utils/client';
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
+import { RPCReadable } from './rpcReadable';
+import type { RecipeImage } from '@shared/src/models/IRecipe';
 
-export const applicationStates: Readable<ApplicationState[]> = readable<ApplicationState[]>([], set => {
-  const sub = rpcBrowser.subscribe(Messages.MSG_APPLICATIONS_STATE_UPDATE, msg => {
-    set(msg);
-  });
-  // Initialize the store manually
-  studioClient.getApplicationsState().then(state => {
-    set(state);
-  });
-  return () => {
-    sub.unsubscribe();
-  };
-});
+export const recipeImages = RPCReadable<RecipeImage[]>([], [Messages.MSG_RECIPE_IMAGES_UPDATE], studioClient.getRecipeImages);

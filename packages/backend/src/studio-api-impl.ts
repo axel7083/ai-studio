@@ -17,22 +17,20 @@
  ***********************************************************************/
 
 import type { StudioAPI } from '@shared/src/StudioAPI';
-import type { ApplicationManager } from './managers/applicationManager';
 import type { ModelCheckerInfo, ModelInfo } from '@shared/src/models/IModelInfo';
 import * as podmanDesktopApi from '@podman-desktop/api';
 
 import type { CatalogManager } from './managers/catalogManager';
 import type { ApplicationCatalog } from '@shared/src/models/IApplicationCatalog';
 import type { ModelsManager } from './managers/modelsManager';
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
+import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
 import type { Task } from '@shared/src/models/ITask';
 import type { TaskRegistry } from './registries/TaskRegistry';
 import type { LocalRepository } from '@shared/src/models/ILocalRepository';
 import type { LocalRepositoryRegistry } from './registries/LocalRepositoryRegistry';
 import path from 'node:path';
-import type { InferenceServer } from '@shared/src/models/IInference';
+import type { InferenceServerInfo } from '@shared/src/models/IInference';
 import type { CreationInferenceServerOptions } from '@shared/src/models/InferenceServerConfig';
-import type { InferenceManager } from './managers/inference/inferenceManager';
 import type { Conversation } from '@shared/src/models/IPlaygroundMessage';
 import type { PlaygroundV2Manager } from './managers/playgroundV2Manager';
 import { getFreeRandomPort } from './utils/ports';
@@ -45,25 +43,26 @@ import type { CancellationTokenRegistry } from './registries/CancellationTokenRe
 import type { LocalModelImportInfo } from '@shared/src/models/ILocalModelInfo';
 import { checkContainerConnectionStatusAndResources, getPodmanConnection } from './utils/podman';
 import type { ContainerConnectionInfo } from '@shared/src/models/IContainerConnectionInfo';
+import type { InferenceServerRegistry } from './registries/InferenceServerRegistry';
+import type { RecipeManager } from './managers/recipes/RecipeManager';
+import type { RecipeImage, StartRecipeConfig } from '@shared/src/models/IRecipe';
+import type { ApplicationEngineRegistry } from './registries/ApplicationEngineRegistry';
 import type { ExtensionConfiguration } from '@shared/src/models/IExtensionConfiguration';
 import type { ConfigurationRegistry } from './registries/ConfigurationRegistry';
 
-interface PortQuickPickItem extends podmanDesktopApi.QuickPickItem {
-  port: number;
-}
-
 export class StudioApiImpl implements StudioAPI {
   constructor(
-    private applicationManager: ApplicationManager,
+    private applicationEngineRegistry: ApplicationEngineRegistry,
     private catalogManager: CatalogManager,
     private modelsManager: ModelsManager,
     private telemetry: podmanDesktopApi.TelemetryLogger,
     private localRepositories: LocalRepositoryRegistry,
     private taskRegistry: TaskRegistry,
-    private inferenceManager: InferenceManager,
+    private inferenceServerRegistry: InferenceServerRegistry,
     private playgroundV2: PlaygroundV2Manager,
     private snippetManager: SnippetManager,
     private cancellationTokenRegistry: CancellationTokenRegistry,
+    private recipeManager: RecipeManager,
     private configurationRegistry: ConfigurationRegistry,
   ) {}
 
@@ -114,19 +113,19 @@ export class StudioApiImpl implements StudioAPI {
     return this.snippetManager.generate(options, language, variant);
   }
 
-  async getInferenceServers(): Promise<InferenceServer[]> {
-    return this.inferenceManager.getServers();
+  async getInferenceServers(): Promise<InferenceServerInfo[]> {
+    return this.inferenceServerRegistry.getInferenceServerInfo();
   }
 
-  async requestDeleteInferenceServer(...containerIds: string[]): Promise<void> {
+  async requestDeleteInferenceServer(...serverId: string[]): Promise<void> {
     // Do not wait on the promise as the api would probably timeout before the user answer.
-    if (containerIds.length === 0) throw new Error('At least one container id should be provided.');
+    if (serverId.length === 0) throw new Error('At least one container id should be provided.');
 
     let dialogMessage: string;
-    if (containerIds.length === 1) {
+    if (serverId.length === 1) {
       dialogMessage = `Are you sure you want to delete this service ?`;
     } else {
-      dialogMessage = `Are you sure you want to delete those ${containerIds.length} services ?`;
+      dialogMessage = `Are you sure you want to delete those ${serverId.length} services ?`;
     }
 
     podmanDesktopApi.window
@@ -134,7 +133,7 @@ export class StudioApiImpl implements StudioAPI {
       .then((result: string | undefined) => {
         if (result !== 'Confirm') return;
 
-        Promise.all(containerIds.map(containerId => this.inferenceManager.deleteInferenceServer(containerId))).catch(
+        Promise.all(serverId.map(containerId => this.inferenceServerRegistry.get(containerId).remove())).catch(
           (err: unknown) => {
             console.error('Something went wrong while trying to delete the inference server', err);
           },
@@ -148,19 +147,25 @@ export class StudioApiImpl implements StudioAPI {
   async requestCreateInferenceServer(options: CreationInferenceServerOptions): Promise<string> {
     try {
       const config = await withDefaultConfiguration(options);
-      return this.inferenceManager.requestCreateInferenceServer(config);
+
+      const runtime = this.inferenceServerRegistry.getRuntime(config.runtime);
+      return runtime.requestCreate(config);
     } catch (err: unknown) {
       console.error('Something went wrong while trying to start inference server', err);
       throw err;
     }
   }
 
-  startInferenceServer(containerId: string): Promise<void> {
-    return this.inferenceManager.startInferenceServer(containerId);
+  startInferenceServer(serverId: string): Promise<void> {
+    return this.inferenceServerRegistry.get(serverId).start();
   }
 
-  stopInferenceServer(containerId: string): Promise<void> {
-    return this.inferenceManager.stopInferenceServer(containerId);
+  navigateToServer(serverId: string): Promise<void> {
+    return this.inferenceServerRegistry.get(serverId).navigate();
+  }
+
+  stopInferenceServer(serverId: string): Promise<void> {
+    return this.inferenceServerRegistry.get(serverId).stop();
   }
 
   async ping(): Promise<string> {
@@ -193,32 +198,19 @@ export class StudioApiImpl implements StudioAPI {
     const recipe = this.catalogManager.getRecipes().find(recipe => recipe.id === recipeId);
     if (!recipe) throw new Error(`recipe with if ${recipeId} not found`);
 
-    return this.applicationManager.cloneApplication(recipe);
+    return this.recipeManager.cloneRecipe(recipe);
   }
 
-  async pullApplication(recipeId: string, modelId: string): Promise<void> {
-    const recipe = this.catalogManager.getRecipes().find(recipe => recipe.id === recipeId);
-    if (!recipe) throw new Error(`recipe with if ${recipeId} not found`);
-
-    const model = this.catalogManager.getModelById(modelId);
-
-    // Do not wait for the pull application, run it separately
-    podmanDesktopApi.window
-      .withProgress({ location: podmanDesktopApi.ProgressLocation.TASK_WIDGET, title: `Pulling ${recipe.name}.` }, () =>
-        this.applicationManager.pullApplication(recipe, model),
-      )
-      .catch((err: unknown) => {
-        console.error('Something went wrong while trying to start application', err);
-        podmanDesktopApi.window
-          .showErrorMessage(`Error starting the application "${recipe.name}": ${String(err)}`)
-          .catch((err: unknown) => {
-            console.error(`Something went wrong with confirmation modals`, err);
-          });
-      });
+  async requestPullApplication(config: StartRecipeConfig): Promise<string> {
+    return this.applicationEngineRegistry.getApplicationRuntime(config.runtime).requestStart(config);
   }
 
   async getModelsInfo(): Promise<ModelInfo[]> {
     return this.modelsManager.getModelsInfo();
+  }
+
+  async getRecipeImages(): Promise<RecipeImage[]> {
+    return this.recipeManager.getImages();
   }
 
   async getCatalog(): Promise<ApplicationCatalog> {
@@ -281,24 +273,27 @@ export class StudioApiImpl implements StudioAPI {
     }
   }
 
-  async getApplicationsState(): Promise<ApplicationState[]> {
-    return this.applicationManager.getApplicationsState();
+  async getApplicationInfo(): Promise<ApplicationInfo[]> {
+    return this.applicationEngineRegistry.getApplicationInfo();
   }
 
-  async requestStartApplication(recipeId: string, modelId: string): Promise<void> {
-    this.applicationManager.startApplication(recipeId, modelId).catch((err: unknown) => {
+  async requestStartPodApplication(_recipeId: string, _modelId: string): Promise<void> {
+    throw new Error('not implemented yet');
+   /* this.applicationManager.startPodApplication(recipeId, modelId).catch((err: unknown) => {
       console.error('Something went wrong while trying to start application', err);
-    });
+    }); */
   }
 
-  async requestStopApplication(recipeId: string, modelId: string): Promise<void> {
-    this.applicationManager.stopApplication(recipeId, modelId).catch((err: unknown) => {
+  async requestStopApplication(_recipeId: string, _modelId: string): Promise<void> {
+    throw new Error('not implemented yet');
+    /*this.applicationManager.stopPodApplication(recipeId, modelId).catch((err: unknown) => {
       console.error('Something went wrong while trying to stop application', err);
-    });
+    });*/
   }
 
-  async requestRemoveApplication(recipeId: string, modelId: string): Promise<void> {
-    const recipe = this.catalogManager.getRecipeById(recipeId);
+  async requestRemoveApplication(_recipeId: string, _modelId: string): Promise<void> {
+    throw new Error('not implemented yet');
+    /*const recipe = this.catalogManager.getRecipeById(recipeId);
     // Do not wait on the promise as the api would probably timeout before the user answer.
     podmanDesktopApi.window
       .showWarningMessage(
@@ -322,11 +317,12 @@ export class StudioApiImpl implements StudioAPI {
       })
       .catch((err: unknown) => {
         console.error(`Something went wrong with confirmation modals`, err);
-      });
+      });*/
   }
 
-  async requestRestartApplication(recipeId: string, modelId: string): Promise<void> {
-    const recipe = this.catalogManager.getRecipeById(recipeId);
+  async requestRestartApplication(_recipeId: string, _modelId: string): Promise<void> {
+    throw new Error('not implemented yet');
+    /*const recipe = this.catalogManager.getRecipeById(recipeId);
     // Do not wait on the promise as the api would probably timeout before the user answer.
     podmanDesktopApi.window
       .showWarningMessage(
@@ -348,11 +344,13 @@ export class StudioApiImpl implements StudioAPI {
       })
       .catch((err: unknown) => {
         console.error(`Something went wrong with confirmation modals`, err);
-      });
+      });*/
   }
 
-  async requestOpenApplication(recipeId: string, modelId: string): Promise<void> {
-    const recipe = this.catalogManager.getRecipeById(recipeId);
+  async requestOpenApplication(_recipeId: string, _modelId: string): Promise<void> {
+    throw new Error('not implemented yet');
+
+    /*const recipe = this.catalogManager.getRecipeById(recipeId);
     this.applicationManager
       .getApplicationPorts(recipeId, modelId)
       .then((ports: number[]) => {
@@ -393,7 +391,7 @@ export class StudioApiImpl implements StudioAPI {
         podmanDesktopApi.window.showErrorMessage(`Error opening the AI App "${recipe.name}"`).catch((err: unknown) => {
           console.error(`Something went wrong with confirmation modals`, err);
         });
-      });
+      });*/
   }
 
   async telemetryLogUsage(

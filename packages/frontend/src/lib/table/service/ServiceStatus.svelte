@@ -1,13 +1,15 @@
 <script lang="ts">
-import type { InferenceServer } from '@shared/src/models/IInference';
+import type { InferenceServerInfo } from '@shared/src/models/IInference';
 import StatusIcon from '/@/lib/StatusIcon.svelte';
 import { studioClient } from '/@/utils/client';
 import { Spinner } from '@podman-desktop/ui-svelte';
 import { ContainerIcon } from '@podman-desktop/ui-svelte/icons';
-export let object: InferenceServer;
+import { RuntimeType } from '@shared/src/models/IInference.js';
+import PodIcon from '/@/lib/images/PodIcon.svelte';
+export let object: InferenceServerInfo;
 
 function navigateToContainer() {
-  studioClient.navigateToContainer(object.container.containerId);
+  studioClient.navigateToServer(object.id);
 }
 
 let status: string;
@@ -51,6 +53,6 @@ function getStatus(): 'RUNNING' | 'STARTING' | 'DEGRADED' | '' {
   <Spinner />
 {:else}
   <button on:click="{navigateToContainer}">
-    <StatusIcon status="{status}" icon="{ContainerIcon}" />
+    <StatusIcon status="{status}" icon="{object.runtime === RuntimeType.PODMAN ? ContainerIcon : PodIcon}" />
   </button>
 {/if}

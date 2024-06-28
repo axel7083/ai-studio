@@ -19,10 +19,10 @@
 import type { ModelCheckerInfo, ModelInfo } from './models/IModelInfo';
 import type { ApplicationCatalog } from './models/IApplicationCatalog';
 import type { OpenDialogOptions, TelemetryTrustedValue, Uri } from '@podman-desktop/api';
-import type { ApplicationState } from './models/IApplicationState';
+import type { ApplicationInfo } from './models/IApplicationState';
 import type { Task } from './models/ITask';
 import type { LocalRepository } from './models/ILocalRepository';
-import type { InferenceServer } from './models/IInference';
+import { type InferenceServerInfo } from './models/IInference';
 import type { RequestOptions } from './models/RequestOptions';
 import type { Language } from 'postman-code-generators';
 import type { CreationInferenceServerOptions } from './models/InferenceServerConfig';
@@ -30,6 +30,7 @@ import type { ModelOptions } from './models/IModelOptions';
 import type { Conversation } from './models/IPlaygroundMessage';
 import type { LocalModelImportInfo } from './models/ILocalModelInfo';
 import type { ContainerConnectionInfo } from './models/IContainerConnectionInfo';
+import type { RecipeImage, StartRecipeConfig } from './models/IRecipe';
 import type { ExtensionConfiguration } from './models/IExtensionConfiguration';
 
 export abstract class StudioAPI {
@@ -42,13 +43,38 @@ export abstract class StudioAPI {
    * @param recipeId
    */
   abstract cloneApplication(recipeId: string): Promise<void>;
-  abstract pullApplication(recipeId: string, modelId: string): Promise<void>;
+
+  /**
+   * Pull an application (clone, download model, build container, start pod)
+   *
+   * @return a promise with a tracking id used in each task labels
+   * @param config
+   */
+  abstract requestPullApplication(config: StartRecipeConfig): Promise<string>;
+
+  /**
+   * @deprecated
+   */
   abstract requestStopApplication(recipeId: string, modelId: string): Promise<void>;
-  abstract requestStartApplication(recipeId: string, modelId: string): Promise<void>;
+  /**
+   * @deprecated
+   */
+  abstract requestStartPodApplication(recipeId: string, modelId: string): Promise<void>;
+  /**
+   * @deprecated
+   */
   abstract requestRemoveApplication(recipeId: string, modelId: string): Promise<void>;
+  /**
+   * @deprecated
+   */
   abstract requestRestartApplication(recipeId: string, modelId: string): Promise<void>;
+  /**
+   * @deprecated
+   */
   abstract requestOpenApplication(recipeId: string, modelId: string): Promise<void>;
-  abstract getApplicationsState(): Promise<ApplicationState[]>;
+
+
+  abstract getApplicationInfo(): Promise<ApplicationInfo[]>;
 
   abstract openURL(url: string): Promise<boolean>;
   abstract openFile(file: string, recipeId?: string): Promise<boolean>;
@@ -58,12 +84,16 @@ export abstract class StudioAPI {
    * Get the information of models saved locally into the user's directory
    */
   abstract getModelsInfo(): Promise<ModelInfo[]>;
+
+  abstract getRecipeImages(): Promise<RecipeImage[]>;
   /**
    * Delete the folder containing the model from local storage
    */
   abstract requestRemoveLocalModel(modelId: string): Promise<void>;
 
   abstract getModelsDirectory(): Promise<string>;
+
+  abstract navigateToServer(serverId: string): Promise<void>;
 
   abstract navigateToContainer(containerId: string): Promise<void>;
   abstract navigateToPod(podId: string): Promise<void>;
@@ -92,7 +122,7 @@ export abstract class StudioAPI {
   /**
    * Get inference servers
    */
-  abstract getInferenceServers(): Promise<InferenceServer[]>;
+  abstract getInferenceServers(): Promise<InferenceServerInfo[]>;
 
   /**
    * Request to start an inference server
@@ -104,21 +134,21 @@ export abstract class StudioAPI {
 
   /**
    * Start an inference server
-   * @param containerId the container id of the inference server
+   * @param serverId the serverId of the inference server
    */
-  abstract startInferenceServer(containerId: string): Promise<void>;
+  abstract startInferenceServer(serverId: string): Promise<void>;
 
   /**
    * Stop an inference server
-   * @param containerId the container id of the inference server
+   * @param serverId the serverId of the inference server
    */
-  abstract stopInferenceServer(containerId: string): Promise<void>;
+  abstract stopInferenceServer(serverId: string): Promise<void>;
 
   /**
    * Delete an inference server container
-   * @param containerIds ids of the container to delete
+   * @param serverId ids of the servers to delete
    */
-  abstract requestDeleteInferenceServer(...containerIds: string[]): Promise<void>;
+  abstract requestDeleteInferenceServer(...serverId: string[]): Promise<void>;
 
   /**
    * Return a free random port on the host machine

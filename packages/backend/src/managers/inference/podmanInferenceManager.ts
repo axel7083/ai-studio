@@ -15,49 +15,56 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import type { InferenceServer, InferenceServerStatus, InferenceType } from '@shared/src/models/IInference';
+import type { InferenceServerStatus, InferenceType} from '@shared/src/models/IInference';
+import { RuntimeType } from '@shared/src/models/IInference';
 import type { PodmanConnection } from '../podmanConnection';
-import { containerEngine, Disposable } from '@podman-desktop/api';
-import { type ContainerInfo, type TelemetryLogger, type Webview } from '@podman-desktop/api';
+import podmanDesktopApi, {
+  containerEngine,
+  type ContainerInfo,
+  Disposable,
+  type TelemetryLogger,
+} from '@podman-desktop/api';
 import type { ContainerRegistry, ContainerStart } from '../../registries/ContainerRegistry';
 import { getInferenceType, isTransitioning, LABEL_INFERENCE_SERVER } from '../../utils/inferenceUtils';
-import { Publisher } from '../../utils/Publisher';
-import { Messages } from '@shared/Messages';
 import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import type { ModelsManager } from '../modelsManager';
 import type { TaskRegistry } from '../../registries/TaskRegistry';
-import { getRandomString } from '../../utils/randomUtils';
 import { basename, dirname } from 'node:path';
 import type { InferenceProviderRegistry } from '../../registries/InferenceProviderRegistry';
-import type { InferenceProvider } from '../../workers/provider/InferenceProvider';
+import type { PodmanInferenceProvider } from '../../workers/provider/inference/PodmanInferenceProvider';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
 import type { CatalogManager } from '../catalogManager';
+import { type InferenceServerInstance, RuntimeEngine } from './RuntimeEngine';
 
-export class InferenceManager extends Publisher<InferenceServer[]> implements Disposable {
-  // Inference server map (containerId -> InferenceServer)
-  #servers: Map<string, InferenceServer>;
+export interface PodmanInferenceDetails {
+  engineId: string;
+  containerId: string;
+}
+
+export class PodmanInferenceManager extends RuntimeEngine<PodmanInferenceDetails> {
+  // Inference server map (containerId -> InferenceServerInstance)
+  #servers: Map<string, InferenceServerInstance<PodmanInferenceDetails>>;
   // Is initialized
   #initialized: boolean;
   // Disposables
   #disposables: Disposable[];
 
   constructor(
-    webview: Webview,
     private containerRegistry: ContainerRegistry,
     private podmanConnection: PodmanConnection,
     private modelsManager: ModelsManager,
     private telemetry: TelemetryLogger,
-    private taskRegistry: TaskRegistry,
+    taskRegistry: TaskRegistry,
     private inferenceProviderRegistry: InferenceProviderRegistry,
     private catalogManager: CatalogManager,
   ) {
-    super(webview, Messages.MSG_INFERENCE_SERVERS_UPDATE, () => this.getServers());
-    this.#servers = new Map<string, InferenceServer>();
+    super('podman', RuntimeType.PODMAN, taskRegistry);
+    this.#servers = new Map<string, InferenceServerInstance<PodmanInferenceDetails>>();
     this.#disposables = [];
     this.#initialized = false;
   }
 
-  init(): void {
+  override init(): void {
     this.podmanConnection.onMachineStart(this.watchMachineEvent.bind(this, 'start'));
     this.podmanConnection.onMachineStop(this.watchMachineEvent.bind(this, 'stop'));
     this.containerRegistry.onStartContainerEvent(this.watchContainerStart.bind(this));
@@ -73,7 +80,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
   /**
    * Cleanup the manager
    */
-  dispose(): void {
+  override dispose(): void {
     this.cleanDisposables();
     this.#servers.clear();
     this.#initialized = false;
@@ -89,7 +96,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
   /**
    * Get the Inference servers
    */
-  public getServers(): InferenceServer[] {
+  override getServers(): InferenceServerInstance<PodmanInferenceDetails>[] {
     return Array.from(this.#servers.values());
   }
 
@@ -97,86 +104,32 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
    * return an inference server
    * @param containerId the containerId of the inference server
    */
-  public get(containerId: string): InferenceServer | undefined {
+  public get(containerId: string): InferenceServerInstance<PodmanInferenceDetails> | undefined {
     return this.#servers.get(containerId);
   }
 
   /**
-   * Creating an inference server can be heavy task (pulling image, uploading model to WSL etc.)
-   * The frontend cannot wait endlessly, therefore we provide a method returning a tracking identifier
-   * that can be used to fetch the tasks
-   *
-   * @param config the config to use to create the inference server
-   *
-   * @return a unique tracking identifier to follow the creation request
-   */
-  requestCreateInferenceServer(config: InferenceServerConfig): string {
-    // create a tracking id to put in the labels
-    const trackingId: string = getRandomString();
-
-    config.labels = {
-      ...config.labels,
-      trackingId: trackingId,
-    };
-
-    const task = this.taskRegistry.createTask('Creating Inference server', 'loading', {
-      trackingId: trackingId,
-    });
-
-    this.createInferenceServer(config)
-      .then((containerId: string) => {
-        this.taskRegistry.updateTask({
-          ...task,
-          state: 'success',
-          labels: {
-            ...task.labels,
-            containerId: containerId,
-          },
-        });
-      })
-      .catch((err: unknown) => {
-        // Get all tasks using the tracker
-        const tasks = this.taskRegistry.getTasksByLabels({
-          trackingId: trackingId,
-        });
-        // Filter the one no in loading state
-        tasks
-          .filter(t => t.state === 'loading' && t.id !== task.id)
-          .forEach(t => {
-            this.taskRegistry.updateTask({
-              ...t,
-              state: 'error',
-            });
-          });
-        // Update the main task
-        this.taskRegistry.updateTask({
-          ...task,
-          state: 'error',
-          error: `Something went wrong while trying to create an inference server ${String(err)}.`,
-        });
-      });
-    return trackingId;
-  }
-
-  /**
-   * Given an engineId, it will create an inference server using an InferenceProvider.
+   * Given an engineId, it will create an inference server using an PodmanInferenceProvider.
    * @param config
    *
    * @return the containerId of the created inference server
    */
-  async createInferenceServer(config: InferenceServerConfig): Promise<string> {
+  override async create(config: InferenceServerConfig): Promise<InferenceServerInstance<PodmanInferenceDetails>> {
     if (!this.isInitialize()) throw new Error('Cannot start the inference server: not initialized.');
 
     // Get the backend for the model inference server {@link InferenceType}
     const backend: InferenceType = getInferenceType(config.modelsInfo);
 
-    let provider: InferenceProvider;
+    let provider: PodmanInferenceProvider;
     if (config.inferenceProvider) {
-      provider = this.inferenceProviderRegistry.get(config.inferenceProvider);
+      provider = this.inferenceProviderRegistry.get<PodmanInferenceProvider>(
+        RuntimeType.PODMAN,
+        config.inferenceProvider,
+      );
       if (!provider.enabled()) throw new Error('provider requested is not enabled.');
     } else {
-      const providers: InferenceProvider[] = this.inferenceProviderRegistry
-        .getByType(backend)
+      const providers: PodmanInferenceProvider[] = this.inferenceProviderRegistry
+        .getByType<PodmanInferenceProvider>(RuntimeType.PODMAN, backend)
         .filter(provider => provider.enabled());
       if (providers.length === 0) throw new Error('no enabled provider could be found.');
       provider = providers[0];
@@ -198,19 +151,28 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
     // create the inference server using the selected inference provider
     const result = await provider.perform(config);
 
-    // Adding a new inference server
-    this.#servers.set(result.id, {
-      container: {
+    const instance: InferenceServerInstance<PodmanInferenceDetails> = {
+      id: result.id,
+      details: {
         engineId: result.engineId,
         containerId: result.id,
       },
       connection: {
         port: config.port,
+        host: 'localhost',
       },
       status: 'running',
       models: config.modelsInfo,
       type: backend,
-    });
+      runtime: RuntimeType.PODMAN,
+      stop: this.stopInferenceServer.bind(this, result.id),
+      start: this.startInferenceServer.bind(this, result.id),
+      remove: this.deleteInferenceServer.bind(this, result.id),
+      navigate: () => podmanDesktopApi.navigation.navigateToContainer(result.id),
+    };
+
+    // Adding a new inference server
+    this.#servers.set(result.id, instance);
 
     // Watch for container changes
     this.watchContainerStatus(result.engineId, result.id);
@@ -221,7 +183,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
     });
 
     this.notify();
-    return result.id;
+    return instance;
   }
 
   /**
@@ -359,7 +321,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
 
     // clean existing disposables
     this.cleanDisposables();
-    this.#servers = new Map<string, InferenceServer>(
+    this.#servers = new Map<string, InferenceServerInstance<PodmanInferenceDetails>>(
       filtered.map(containerInfo => {
         let modelInfos: ModelInfo[] = [];
         try {
@@ -374,23 +336,30 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
         return [
           containerInfo.Id,
           {
-            container: {
+            id: containerInfo.Id,
+            details: {
               containerId: containerInfo.Id,
               engineId: containerInfo.engineId,
             },
             connection: {
+              host: 'localhost',
               port: !!containerInfo.Ports && containerInfo.Ports.length > 0 ? containerInfo.Ports[0].PublicPort : -1,
             },
             status: containerInfo.Status === 'running' ? 'running' : 'stopped',
             models: modelInfos,
+            runtime: RuntimeType.PODMAN,
             type: getInferenceType(modelInfos),
-          } as InferenceServer,
+            stop: this.stopInferenceServer.bind(this, containerInfo.Id),
+            start: this.startInferenceServer.bind(this, containerInfo.Id),
+            remove: this.deleteInferenceServer.bind(this, containerInfo.Id),
+            navigate: () => podmanDesktopApi.navigation.navigateToContainer(containerInfo.Id),
+          },
         ];
       }),
     );
 
     // (re-)create container watchers
-    this.#servers.forEach(server => this.watchContainerStatus(server.container.engineId, server.container.containerId));
+    this.#servers.forEach(server => this.watchContainerStatus(server.details.engineId, server.details.containerId));
     this.#initialized = true;
     // notify update
     this.notify();
@@ -407,7 +376,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
   }
 
   /**
-   * Delete the InferenceServer instance from #servers and matching container
+   * Delete the InferenceServerInfo instance from #servers and matching container
    * @param containerId the id of the container running the Inference Server
    */
   async deleteInferenceServer(containerId: string): Promise<void> {
@@ -418,21 +387,21 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
 
     try {
       // Set status a deleting
-      this.setInferenceServerStatus(server.container.containerId, 'deleting');
+      this.setInferenceServerStatus(server.details.containerId, 'deleting');
 
       // If the server is running we need to stop it.
       if (server.status === 'running') {
-        await containerEngine.stopContainer(server.container.engineId, server.container.containerId);
+        await containerEngine.stopContainer(server.details.engineId, server.details.containerId);
       }
 
       // Delete the container
-      await containerEngine.deleteContainer(server.container.engineId, server.container.containerId);
+      await containerEngine.deleteContainer(server.details.engineId, server.details.containerId);
 
       // Delete the reference
       this.removeInferenceServer(containerId);
     } catch (err: unknown) {
       console.error('Something went wrong while trying to delete the inference server.', err);
-      this.setInferenceServerStatus(server.container.containerId, 'error');
+      this.setInferenceServerStatus(server.details.containerId, 'error');
       this.retryableRefresh(2);
     }
   }
@@ -449,19 +418,19 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
 
     try {
       // set status to starting
-      this.setInferenceServerStatus(server.container.containerId, 'starting');
-      await containerEngine.startContainer(server.container.engineId, server.container.containerId);
+      this.setInferenceServerStatus(server.details.containerId, 'starting');
+      await containerEngine.startContainer(server.details.engineId, server.details.containerId);
 
-      this.setInferenceServerStatus(server.container.containerId, 'running');
+      this.setInferenceServerStatus(server.details.containerId, 'running');
       // start watch for container status update
-      this.watchContainerStatus(server.container.engineId, server.container.containerId);
+      this.watchContainerStatus(server.details.engineId, server.details.containerId);
     } catch (error: unknown) {
       console.error(error);
       this.telemetry.logError('inference.start', {
         message: 'error starting inference',
         error: error,
       });
-      this.setInferenceServerStatus(server.container.containerId, 'error');
+      this.setInferenceServerStatus(server.details.containerId, 'error');
       this.retryableRefresh(1);
     }
   }
@@ -480,11 +449,11 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
 
     try {
       // set server to stopping
-      this.setInferenceServerStatus(server.container.containerId, 'stopping');
+      this.setInferenceServerStatus(server.details.containerId, 'stopping');
 
-      await containerEngine.stopContainer(server.container.engineId, server.container.containerId);
+      await containerEngine.stopContainer(server.details.engineId, server.details.containerId);
       // once stopped update the status
-      this.setInferenceServerStatus(server.container.containerId, 'stopped');
+      this.setInferenceServerStatus(server.details.containerId, 'stopped');
     } catch (error: unknown) {
       console.error(error);
       this.telemetry.logError('inference.stop', {
@@ -492,7 +461,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
         error: error,
       });
 
-      this.setInferenceServerStatus(server.container.containerId, 'error');
+      this.setInferenceServerStatus(server.details.containerId, 'error');
       this.retryableRefresh(1);
     }
   }
@@ -506,7 +475,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
     const server = this.#servers.get(containerId);
     if (server === undefined) throw new Error(`cannot find a corresponding server for container id ${containerId}.`);
 
-    this.#servers.set(server.container.containerId, {
+    this.#servers.set(server.details.containerId, {
       ...server,
       status: status,
       health: undefined, // always reset health history when changing status
