@@ -16,12 +16,12 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
 import type { KnownStatus } from '../lib/StatusIcon';
+import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
 
 /* returns the status of the AI application, to be used by <IconStatus> */
-export function getApplicationStatus(appState: ApplicationState): KnownStatus | 'UNKNOWN' {
-  const podStatus = appState.pod.Status.toUpperCase();
+export function getApplicationStatus(appState: ApplicationInfo): KnownStatus | 'UNKNOWN' {
+  const podStatus = appState.status.toUpperCase();
   if (['DEGRADED', 'STARTING', 'USED', 'DELETING', 'CREATED'].includes(podStatus)) {
     return podStatus as KnownStatus;
   }
@@ -40,8 +40,8 @@ export function getApplicationStatus(appState: ApplicationState): KnownStatus | 
 }
 
 /* returns the status of the AI application in plain text */
-export function getApplicationStatusText(appState: ApplicationState): string {
-  if (appState.pod.Status === 'Running') {
+export function getApplicationStatusText(appState: ApplicationInfo): string {
+  if (appState.status === 'running') {
     if (appState.health === 'starting') {
       return 'Starting';
     }
@@ -49,5 +49,5 @@ export function getApplicationStatusText(appState: ApplicationState): string {
       return 'Degraded';
     }
   }
-  return appState.pod.Status;
+  return appState.status;
 }

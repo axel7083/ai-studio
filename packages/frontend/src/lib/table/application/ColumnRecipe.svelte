@@ -1,9 +1,9 @@
 <script lang="ts">
 import { catalog } from '/@/stores/catalog';
 import { displayPorts } from '/@/utils/printers';
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
+import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
 
-export let object: ApplicationState;
+export let object: ApplicationInfo;
 
 let name: string | undefined;
 $: name = $catalog.recipes.find(r => r.id === object.recipeId)?.name;

@@ -17,7 +17,7 @@
  ***********************************************************************/
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { TaskRegistry } from '../../registries/TaskRegistry';
+import type { TaskRegistry } from '../../../registries/TaskRegistry';
 import { type BetterContainerCreateResult, PodmanInferenceProvider } from './PodmanInferenceProvider';
 import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import type {
@@ -27,7 +27,7 @@ import type {
   ProviderContainerConnection,
 } from '@podman-desktop/api';
 import { containerEngine } from '@podman-desktop/api';
-import { getImageInfo, getProviderContainerConnection } from '../../utils/inferenceUtils';
+import { getImageInfo, getProviderContainerConnection } from '../../../utils/inferenceUtils';
 import type { TaskState } from '@shared/src/models/ITask';
 import { InferenceType } from '@shared/src/models/IInference';
 

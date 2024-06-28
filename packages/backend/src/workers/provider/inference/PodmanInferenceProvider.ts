@@ -17,8 +17,8 @@
  ***********************************************************************/
 import type { ContainerCreateOptions, ContainerCreateResult, ImageInfo, PullEvent } from '@podman-desktop/api';
 import { containerEngine } from '@podman-desktop/api';
-import type { TaskRegistry } from '../../registries/TaskRegistry';
-import { getImageInfo, getProviderContainerConnection } from '../../utils/inferenceUtils';
+import type { TaskRegistry } from '../../../registries/TaskRegistry';
+import { getImageInfo, getProviderContainerConnection } from '../../../utils/inferenceUtils';
 import { type InferenceType, RuntimeType } from '@shared/src/models/IInference';
 import { InferenceProvider } from './InferenceProvider';
 

@@ -15,23 +15,29 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import type { IWorker } from '../IWorker';
-import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
+import type { IWorker } from '../../IWorker';
 import type { Disposable } from '@podman-desktop/api';
-import type { InferenceType, RuntimeType } from '@shared/src/models/IInference';
+import type { Recipe, RecipeImage } from '@shared/src/models/IRecipe';
+import type { RuntimeType } from '@shared/src/models/IInference';
+import type { TaskRegistry } from '../../../registries/TaskRegistry';
+import type { ModelInfo } from '@shared/src/models/IModelInfo';
 
-export abstract class InferenceProvider<T> implements IWorker<InferenceServerConfig, T>, Disposable {
+export interface ApplicationProviderConfiguration {
+  recipe: Recipe,
+  model: ModelInfo,
+  images: RecipeImage[],
+  modelPath: string,
+  labels?: { [key: string]: string },
+}
+
+export abstract class ApplicationProvider<T> implements IWorker<ApplicationProviderConfiguration, T>, Disposable {
   readonly runtime: RuntimeType;
-  readonly type: InferenceType;
-  readonly name: string;
 
-  protected constructor(runtime: RuntimeType, type: InferenceType, name: string) {
+  protected constructor(runtime: RuntimeType, protected taskRegistry: TaskRegistry) {
     this.runtime = runtime;
-    this.type = type;
-    this.name = name;
   }
 
   abstract enabled(): boolean;
-  abstract perform(config: InferenceServerConfig): Promise<T>;
+  abstract perform(config: ApplicationProviderConfiguration): Promise<T>;
   abstract dispose(): void;
 }

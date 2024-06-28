@@ -1,10 +1,10 @@
 <script lang="ts">
 import { getApplicationStatus } from '../../../pages/applications';
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
 import StatusIcon from '../../StatusIcon.svelte';
 import PodIcon from '../../images/PodIcon.svelte';
 import { Spinner } from '@podman-desktop/ui-svelte';
-export let object: ApplicationState;
+import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
+export let object: ApplicationInfo;
 
 $: status = getApplicationStatus(object);
 </script>

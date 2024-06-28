@@ -26,7 +26,7 @@ function deleteApplication() {
 }
 
 function startApplication() {
-  studioClient.requestStartApplication(recipeId, modelId).catch(err => {
+  studioClient.requestStartPodApplication(recipeId, modelId).catch(err => {
     console.error(`Something went wrong while trying to start AI App: ${String(err)}.`);
   });
 }

@@ -17,10 +17,10 @@
  ***********************************************************************/
 
 import { vi, describe, test, expect, beforeEach } from 'vitest';
-import type { TaskRegistry } from '../../registries/TaskRegistry';
+import type { TaskRegistry } from '../../../registries/TaskRegistry';
 import { LLAMA_CPP_INFERENCE_IMAGE, PodmanLlamaCppPython, SECOND } from './PodmanLlamaCppPython';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
-import { getImageInfo, getProviderContainerConnection } from '../../utils/inferenceUtils';
+import { getImageInfo, getProviderContainerConnection } from '../../../utils/inferenceUtils';
 import type { ContainerProviderConnection, ImageInfo, ProviderContainerConnection } from '@podman-desktop/api';
 import { containerEngine } from '@podman-desktop/api';
 

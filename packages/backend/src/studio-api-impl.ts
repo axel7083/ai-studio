@@ -17,14 +17,13 @@
  ***********************************************************************/
 
 import type { StudioAPI } from '@shared/src/StudioAPI';
-import type { ApplicationManager } from './managers/applicationManager';
 import type { ModelCheckerInfo, ModelInfo } from '@shared/src/models/IModelInfo';
 import * as podmanDesktopApi from '@podman-desktop/api';
 
 import type { CatalogManager } from './managers/catalogManager';
 import type { ApplicationCatalog } from '@shared/src/models/IApplicationCatalog';
 import type { ModelsManager } from './managers/modelsManager';
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
+import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
 import type { Task } from '@shared/src/models/ITask';
 import type { TaskRegistry } from './registries/TaskRegistry';
 import type { LocalRepository } from '@shared/src/models/ILocalRepository';
@@ -46,15 +45,12 @@ import { checkContainerConnectionStatusAndResources, getPodmanConnection } from 
 import type { ContainerConnectionInfo } from '@shared/src/models/IContainerConnectionInfo';
 import type { InferenceServerRegistry } from './registries/InferenceServerRegistry';
 import type { RecipeManager } from './managers/recipes/RecipeManager';
-import type { RecipeImage } from '@shared/src/models/IRecipe';
-
-interface PortQuickPickItem extends podmanDesktopApi.QuickPickItem {
-  port: number;
-}
+import type { RecipeImage, StartRecipeConfig } from '@shared/src/models/IRecipe';
+import type { ApplicationEngineRegistry } from './registries/ApplicationEngineRegistry';
 
 export class StudioApiImpl implements StudioAPI {
   constructor(
-    private applicationManager: ApplicationManager,
+    private applicationEngineRegistry: ApplicationEngineRegistry,
     private catalogManager: CatalogManager,
     private modelsManager: ModelsManager,
     private telemetry: podmanDesktopApi.TelemetryLogger,
@@ -198,13 +194,8 @@ export class StudioApiImpl implements StudioAPI {
     return this.recipeManager.cloneRecipe(recipe);
   }
 
-  async requestPullApplication(recipeId: string, modelId: string): Promise<string> {
-    const recipe = this.catalogManager.getRecipes().find(recipe => recipe.id === recipeId);
-    if (!recipe) throw new Error(`recipe with if ${recipeId} not found`);
-
-    const model = this.catalogManager.getModelById(modelId);
-
-    return this.applicationManager.requestPullApplication(recipe, model);
+  async requestPullApplication(config: StartRecipeConfig): Promise<string> {
+    return this.applicationEngineRegistry.getApplicationRuntime(config.runtime).requestStart(config);
   }
 
   async getModelsInfo(): Promise<ModelInfo[]> {
@@ -275,24 +266,27 @@ export class StudioApiImpl implements StudioAPI {
     }
   }
 
-  async getApplicationsState(): Promise<ApplicationState[]> {
-    return this.applicationManager.getApplicationsState();
+  async getApplicationInfo(): Promise<ApplicationInfo[]> {
+    return this.applicationEngineRegistry.getApplicationInfo();
   }
 
-  async requestStartApplication(recipeId: string, modelId: string): Promise<void> {
-    this.applicationManager.startApplication(recipeId, modelId).catch((err: unknown) => {
+  async requestStartPodApplication(_recipeId: string, _modelId: string): Promise<void> {
+    throw new Error('not implemented yet');
+   /* this.applicationManager.startPodApplication(recipeId, modelId).catch((err: unknown) => {
       console.error('Something went wrong while trying to start application', err);
-    });
+    }); */
   }
 
-  async requestStopApplication(recipeId: string, modelId: string): Promise<void> {
-    this.applicationManager.stopApplication(recipeId, modelId).catch((err: unknown) => {
+  async requestStopApplication(_recipeId: string, _modelId: string): Promise<void> {
+    throw new Error('not implemented yet');
+    /*this.applicationManager.stopPodApplication(recipeId, modelId).catch((err: unknown) => {
       console.error('Something went wrong while trying to stop application', err);
-    });
+    });*/
   }
 
-  async requestRemoveApplication(recipeId: string, modelId: string): Promise<void> {
-    const recipe = this.catalogManager.getRecipeById(recipeId);
+  async requestRemoveApplication(_recipeId: string, _modelId: string): Promise<void> {
+    throw new Error('not implemented yet');
+    /*const recipe = this.catalogManager.getRecipeById(recipeId);
     // Do not wait on the promise as the api would probably timeout before the user answer.
     podmanDesktopApi.window
       .showWarningMessage(
@@ -316,11 +310,12 @@ export class StudioApiImpl implements StudioAPI {
       })
       .catch((err: unknown) => {
         console.error(`Something went wrong with confirmation modals`, err);
-      });
+      });*/
   }
 
-  async requestRestartApplication(recipeId: string, modelId: string): Promise<void> {
-    const recipe = this.catalogManager.getRecipeById(recipeId);
+  async requestRestartApplication(_recipeId: string, _modelId: string): Promise<void> {
+    throw new Error('not implemented yet');
+    /*const recipe = this.catalogManager.getRecipeById(recipeId);
     // Do not wait on the promise as the api would probably timeout before the user answer.
     podmanDesktopApi.window
       .showWarningMessage(
@@ -342,11 +337,13 @@ export class StudioApiImpl implements StudioAPI {
       })
       .catch((err: unknown) => {
         console.error(`Something went wrong with confirmation modals`, err);
-      });
+      });*/
   }
 
-  async requestOpenApplication(recipeId: string, modelId: string): Promise<void> {
-    const recipe = this.catalogManager.getRecipeById(recipeId);
+  async requestOpenApplication(_recipeId: string, _modelId: string): Promise<void> {
+    throw new Error('not implemented yet');
+
+    /*const recipe = this.catalogManager.getRecipeById(recipeId);
     this.applicationManager
       .getApplicationPorts(recipeId, modelId)
       .then((ports: number[]) => {
@@ -387,7 +384,7 @@ export class StudioApiImpl implements StudioAPI {
         podmanDesktopApi.window.showErrorMessage(`Error opening the AI App "${recipe.name}"`).catch((err: unknown) => {
           console.error(`Something went wrong with confirmation modals`, err);
         });
-      });
+      });*/
   }
 
   async telemetryLogUsage(

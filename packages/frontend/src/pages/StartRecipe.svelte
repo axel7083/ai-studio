@@ -17,7 +17,7 @@ import Select from 'svelte-select';
 import { modelsInfo } from '/@/stores/modelsInfo';
 import { Button, FormPage } from '@podman-desktop/ui-svelte';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
-import { InferenceType } from '@shared/src/models/IInference';
+import { InferenceType, RuntimeType } from '@shared/src/models/IInference';
 import { studioClient } from '/@/utils/client';
 import type { Task } from '@shared/src/models/ITask';
 import { filterByLabel } from '/@/utils/taskUtils';
@@ -55,8 +55,11 @@ $: {
 }
 
 // The tracking id is a unique identifier provided by the
-// backend when calling requestPullApplication
+// backend when calling requestStartRecipe
 let trackingId: string | undefined = undefined;
+
+// runtime used
+let runtime: RuntimeType = RuntimeType.PODMAN;
 
 // The trackedTasks are the tasks linked to the trackingId
 let trackedTasks: Task[];
@@ -115,7 +118,11 @@ async function submit(): Promise<void> {
   if (!recipe || !value) return;
 
   loading = true;
-  trackingId = await studioClient.requestPullApplication(recipe.id, value.id);
+  trackingId = await studioClient.requestPullApplication({
+    runtime: runtime,
+    modelId: value.id,
+    recipeId: recipe.id,
+  });
   router.location.query.set('trackingId', trackingId);
 }
 
@@ -175,6 +182,27 @@ export function goToUpPage(): void {
         <!-- form -->
         <div class="space-y-6 bg-charcoal-800 m-5 px-8 sm:pb-6 xl:pb-8 rounded-lg h-fit">
           <div>
+            <label for="model" class="pt-4 block mb-2 text-sm font-bold text-[var(--pd-content-card-header-text)]"
+            >Runtime</label>
+            <select
+              required
+              bind:value="{runtime}"
+              disabled="{loading}"
+              aria-label="Runtime select"
+              id="runtime-select"
+              class="border text-sm rounded-lg w-full focus:ring-purple-500 focus:border-purple-500 block p-2.5 bg-charcoal-900 border-charcoal-900 placeholder-gray-700 text-white"
+              name="runtime select">
+              <option class="my-1" value="{RuntimeType.PODMAN}">{RuntimeType.PODMAN}</option>
+              <option class="my-1" value="{RuntimeType.KUBERNETES}">{RuntimeType.KUBERNETES}</option>
+            </select>
+            {#if runtime === RuntimeType.KUBERNETES}
+              <div class="text-gray-800 text-sm flex items-center">
+                <Fa class="mr-2" icon="{faWarning}" />
+                <span role="alert"
+                >You need to configure a registry with write access to be able to deploy on Kubernetes a recipe</span>
+              </div>
+            {/if}
+
             <!-- selected recipe -->
             <label for="recipe" class="pt-4 block mb-2 text-sm font-bold text-gray-400">Recipe</label>
 

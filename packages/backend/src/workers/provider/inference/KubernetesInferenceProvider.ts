@@ -18,13 +18,13 @@
 import { InferenceProvider } from './InferenceProvider';
 import type { V1PersistentVolumeClaim, V1Pod } from '@kubernetes/client-node';
 import { CoreV1Api, KubeConfig } from '@kubernetes/client-node';
-import { AI_LAB_ANNOTATIONS, DEFAULT_NAMESPACE } from '../../managers/inference/kubernetesInferenceManager';
+import { AI_LAB_ANNOTATIONS, DEFAULT_NAMESPACE } from '../../../managers/inference/kubernetesInferenceManager';
 import { kubernetes } from '@podman-desktop/api';
-import type { TaskRegistry } from '../../registries/TaskRegistry';
+import type { TaskRegistry } from '../../../registries/TaskRegistry';
 import type { InferenceType } from '@shared/src/models/IInference';
 import { RuntimeType } from '@shared/src/models/IInference';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
-import { getRandomString } from '../../utils/randomUtils';
+import { getRandomString } from '../../../utils/randomUtils';
 
 export function getKubeConfig(): KubeConfig {
   const uri = kubernetes.getKubeconfig();

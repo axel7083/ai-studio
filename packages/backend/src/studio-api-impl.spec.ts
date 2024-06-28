@@ -20,7 +20,7 @@
 
 import { beforeEach, expect, test, vi, describe } from 'vitest';
 import content from './tests/ai-test.json';
-import type { ApplicationManager } from './managers/applicationManager';
+import type { PodmanApplicationManager } from './managers/applications/podmanApplicationManager';
 import { StudioApiImpl } from './studio-api-impl';
 import type { ProviderContainerConnection, TelemetryLogger, Webview } from '@podman-desktop/api';
 import { window, EventEmitter, navigation } from '@podman-desktop/api';
@@ -97,7 +97,7 @@ vi.mock('@podman-desktop/api', async () => {
 let studioApiImpl: StudioApiImpl;
 let catalogManager: CatalogManager;
 let localRepositoryRegistry: LocalRepositoryRegistry;
-let applicationManager: ApplicationManager;
+let applicationManager: PodmanApplicationManager;
 
 beforeEach(async () => {
   vi.resetAllMocks();
@@ -116,7 +116,7 @@ beforeEach(async () => {
   applicationManager = {
     removeApplication: mocks.deleteApplicationMock,
     requestPullApplication: vi.fn(),
-  } as unknown as ApplicationManager;
+  } as unknown as PodmanApplicationManager;
 
   localRepositoryRegistry = new LocalRepositoryRegistry(
     {
@@ -158,7 +158,7 @@ beforeEach(async () => {
   } as unknown as EventEmitter<unknown>);
 });
 
-test('expect requestPullApplication to provide a tracking id', async () => {
+test('expect requestStartRecipe to provide a tracking id', async () => {
   vi.spyOn(catalogManager, 'getRecipes').mockReturnValue([
     {
       id: 'recipe 1',
@@ -168,10 +168,10 @@ test('expect requestPullApplication to provide a tracking id', async () => {
     id: 'model',
   } as unknown as ModelInfo);
 
-  vi.mocked(applicationManager.requestPullApplication).mockResolvedValue('dummy-tracker');
+  vi.mocked(applicationManager.requestStartRecipe).mockResolvedValue('dummy-tracker');
 
   const trackingId = await studioApiImpl.requestPullApplication('recipe 1', 'model1');
-  expect(applicationManager.requestPullApplication).toHaveBeenCalledOnce();
+  expect(applicationManager.requestStartRecipe).toHaveBeenCalledOnce();
   expect(trackingId).toBe('dummy-tracker');
 });
 
