@@ -15,11 +15,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import { ApplicationProvider, ApplicationProviderConfiguration } from './ApplicationProvider';
+import type { ApplicationProviderConfiguration } from './ApplicationProvider';
+import { ApplicationProvider } from './ApplicationProvider';
 import type { V1Pod } from '@kubernetes/client-node';
-import { RecipeImage } from '@shared/src/models/IRecipe';
+import type { RecipeImage } from '@shared/src/models/IRecipe';
 import { containerEngine } from '@podman-desktop/api';
-import { TaskRegistry } from '../../../registries/TaskRegistry';
+import type { TaskRegistry } from '../../../registries/TaskRegistry';
 import { RuntimeType } from '@shared/src/models/IInference';
 
 export class KubernetesApplicationProvider extends ApplicationProvider<V1Pod> {
@@ -28,18 +29,20 @@ export class KubernetesApplicationProvider extends ApplicationProvider<V1Pod> {
     super(RuntimeType.KUBERNETES, taskRegistry);
   }
 
-    override enabled(): boolean {
-        throw new Error('Method not implemented.');
-    }
-    override async perform(config: ApplicationProviderConfiguration): Promise<V1Pod> {
-      // first push the images to the registry
-      await Promise.all(config.images.map(image => this.pushImage(image, config.labels ?? {})));
+  override enabled(): boolean {
+    return true;
+  }
+  override async perform(config: ApplicationProviderConfiguration): Promise<V1Pod> {
+    console.log('[KubernetesApplicationProvider] perform', config);
 
-      throw new Error('method not implemented yet');
-    }
+    // first push the images to the registry
+    await Promise.all(config.images.map(image => this.pushImage(image, config.labels ?? {})));
 
+    throw new Error('method not implemented yet');
+  }
 
   protected async pushImage(image: RecipeImage, labels: Record<string, string>): Promise<void> {
+    console.log(`[KubernetesApplicationProvider] push ${image.id} (${image?.name})`);
     if(!image.name) throw new Error('image do not having registry defined.');
 
     const pushTask = this.taskRegistry.createTask(`Pushing ${image.name}`, 'loading', {
@@ -50,6 +53,7 @@ export class KubernetesApplicationProvider extends ApplicationProvider<V1Pod> {
       await containerEngine.pushImage(image.engineId, image.id, () => {});
       pushTask.state = 'success';
     } catch (err: unknown) {
+      console.error(err);
       pushTask.error = `Something went wrong while pushing image: ${String(err)}`;
       pushTask.state = 'error';
       throw err;

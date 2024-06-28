@@ -280,6 +280,7 @@ export class Studio {
       this.#kubernetesApplicationProvider,
       this.#taskRegistry,
       this.#catalogManager,
+      this.#recipeManager,
     );
     this.#kubernetesApplicationManager.init();
     this.#extensionContext.subscriptions.push(this.#kubernetesApplicationManager);

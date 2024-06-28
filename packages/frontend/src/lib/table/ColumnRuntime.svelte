@@ -1,9 +1,9 @@
 <script lang="ts">
-import { type InferenceServerInfo, RuntimeType } from '@shared/src/models/IInference';
-export let object: InferenceServerInfo;
+import { RuntimeType } from '@shared/src/models/IInference';
+export let object: RuntimeType;
 
-function getProviderColour(providerName: string): string {
-  switch (providerName?.toLowerCase()) {
+function getProviderColour(object: RuntimeType): string {
+  switch (object) {
     case RuntimeType.PODMAN:
       return 'bg-purple-600';
     case RuntimeType.KUBERNETES:
@@ -16,6 +16,6 @@ function getProviderColour(providerName: string): string {
 
 <div
   class="flex items-center bg-[var(--pd-label-bg)] p-1 rounded-md text-xs text-[var(--pd-label-text)] gap-x-1 capitalize">
-  <div class="w-2 h-2 {getProviderColour(object.runtime)} rounded-full"></div>
-  {object.runtime}
+  <div class="w-2 h-2 {getProviderColour(object)} rounded-full"></div>
+  {object}
 </div>
