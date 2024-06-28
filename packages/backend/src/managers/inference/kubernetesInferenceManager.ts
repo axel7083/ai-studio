@@ -15,30 +15,34 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
-import { InferenceServerInstance, RuntimeEngine } from './RuntimeEngine';
-import { TaskRegistry } from '../../registries/TaskRegistry';
-import { InferenceServerStatus, InferenceType, RuntimeType } from '@shared/src/models/IInference';
-import { type Disposable, kubernetes, navigation } from '@podman-desktop/api';
-import { type V1Pod, makeInformer, Informer, PortForward } from '@kubernetes/client-node';
-import { ModelInfo } from '@shared/src/models/IModelInfo';
-import { ADD, CHANGE, DELETE, ERROR, UPDATE } from '@kubernetes/client-node';
-import { ModelsManager } from '../modelsManager';
-import { createServer, Server as ProxyServer, Socket } from 'net';
-import {
-  getCoreV1Api,
-  getKubeConfig,
-  getLabelSelector,
+import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
+import type { InferenceServerInstance} from './RuntimeEngine';
+import { RuntimeEngine } from './RuntimeEngine';
+import type { TaskRegistry } from '../../registries/TaskRegistry';
+import type { InferenceServerStatus} from '@shared/src/models/IInference';
+import { InferenceType, RuntimeType } from '@shared/src/models/IInference';
+import { navigation } from '@podman-desktop/api';
+import type { ADD, CHANGE, ERROR, UPDATE , V1Pod  } from '@kubernetes/client-node';
+import type { ModelInfo } from '@shared/src/models/IModelInfo';
+import { DELETE , PortForward  } from '@kubernetes/client-node';
+import type { ModelsManager } from '../modelsManager';
+import type { Server as ProxyServer, Socket } from 'net';
+import { createServer } from 'net';
+import type {
   KubernetesInferenceProvider,
 } from '../../workers/provider/inference/KubernetesInferenceProvider';
 import { getInferenceType } from '../../utils/inferenceUtils';
-import { InferenceProviderRegistry } from '../../registries/InferenceProviderRegistry';
+import type { InferenceProviderRegistry } from '../../registries/InferenceProviderRegistry';
+import type { KubernetesPodRegistry} from '../../registries/KubernetesPodRegistry';
+import { getCoreV1Api, getKubeConfig, DEFAULT_NAMESPACE } from '../../registries/KubernetesPodRegistry';
 
-export const DEFAULT_NAMESPACE = 'default';
+export enum AI_LAB_INFERENCE_ANNOTATIONS {
+  MODEL = 'podman-ai-lab-inference-model',
+  PORT = 'podman-ai-lab-inference-port',
+}
 
-export enum AI_LAB_ANNOTATIONS {
-  MODEL = 'podman-ai-lab-model',
-  PORT = 'podman-ai-lab-port',
+export enum AI_LAB_SERVICE_INFERENCE_LABEL {
+  MODEL = AI_LAB_INFERENCE_ANNOTATIONS.MODEL,
 }
 
 export interface KubernetesInferenceDetails {
@@ -48,9 +52,6 @@ export interface KubernetesInferenceDetails {
 
 export class KubernetesInferenceManager extends RuntimeEngine<KubernetesInferenceDetails> {
   #servers: Map<string, InferenceServerInstance<KubernetesInferenceDetails>>;
-  #kubeConfigDisposable: Disposable | undefined;
-  #informer: Informer<V1Pod> | undefined;
-  #watchers: Disposable[];
   // related to port forwards
   #proxies: Map<string, { server: ProxyServer; sockets: Socket[] }>;
 
@@ -58,41 +59,16 @@ export class KubernetesInferenceManager extends RuntimeEngine<KubernetesInferenc
     taskRegistry: TaskRegistry,
     private modelManager: ModelsManager,
     private inferenceProviderRegistry: InferenceProviderRegistry,
+    private kubernetesPodRegistry: KubernetesPodRegistry,
   ) {
     super('kubernetes', RuntimeType.KUBERNETES, taskRegistry);
 
     this.#servers = new Map();
-    this.#watchers = [];
     this.#proxies = new Map();
   }
 
   override init(): void {
-    this.#kubeConfigDisposable = kubernetes.onDidUpdateKubeconfig(() => {
-      this.refresh();
-    });
-
-    this.initInformer();
-  }
-
-  protected initInformer(): void {
-    const coreApi = getCoreV1Api();
-
-    const listFn = () => coreApi.listNamespacedPod(DEFAULT_NAMESPACE);
-    this.#informer = makeInformer(
-      getKubeConfig(),
-      `/api/v1/namespaces/${DEFAULT_NAMESPACE}/pods`,
-      listFn,
-      getLabelSelector(),
-    );
-    this.#informer.on(ADD, this.updateStatus.bind(this, ADD));
-    this.#informer.on(UPDATE, this.updateStatus.bind(this, UPDATE));
-    this.#informer.on(CHANGE, this.updateStatus.bind(this, CHANGE));
-    this.#informer.on(DELETE, this.updateStatus.bind(this, DELETE));
-    this.#informer.on(ERROR, this.updateStatus.bind(this, ERROR));
-
-    this.#informer.start().catch((err: unknown) => {
-      console.error('Something went wrong while trying to start kubernetes informer', err);
-    });
+    this.kubernetesPodRegistry.onInformerEvent((event) => this.updateStatus(event.status, event.pod));
   }
 
   protected clearProxy(serverId: string): void {
@@ -128,6 +104,9 @@ export class KubernetesInferenceManager extends RuntimeEngine<KubernetesInferenc
   protected updateStatus(status: ADD | UPDATE | CHANGE | DELETE | ERROR, pod: V1Pod): void {
     if (!pod.metadata?.uid) throw new Error('invalid pod metadata');
 
+    // ensure the pod is Inference Server and not an application
+    if(!pod.metadata?.annotations || !(AI_LAB_INFERENCE_ANNOTATIONS.MODEL in pod.metadata.annotations) ) return;
+
     if (status === DELETE) {
       // clear corresponding proxy
       this.clearProxy(pod.metadata.uid);
@@ -141,35 +120,22 @@ export class KubernetesInferenceManager extends RuntimeEngine<KubernetesInferenc
     this.notify();
   }
 
-  private refresh(): void {
-    this.clearServers();
-
-    this.#watchers.forEach(watcher => watcher.dispose());
-    this.#informer
-      ?.stop()
-      .catch((err: unknown) => {
-        console.error('Something went wrong while trying to stop kubernetes informer', err);
-      })
-      .finally(() => {
-        this.initInformer();
-      });
-  }
-
   /**
    * Given a pod, return a ProxyServer
    * @param pod
    * @protected
    */
   protected createProxy(pod: V1Pod): ProxyServer {
-    if (!pod.metadata || !pod.metadata.name) throw new Error('invalid pod metadata');
+    if (!pod.metadata?.name) throw new Error('invalid pod metadata');
 
     const podName = pod.metadata.name;
     const targetPorts: number[] = [];
-    for (let container of pod.spec?.containers ?? []) {
+    for (const container of pod.spec?.containers ?? []) {
       targetPorts.push(...(container.ports ?? []).map(value => value.containerPort));
     }
     const forward = new PortForward(getKubeConfig());
     return createServer(socket => {
+      // eslint-disable-next-line no-null/no-null
       forward.portForward(DEFAULT_NAMESPACE, podName, targetPorts, socket, null, socket).catch((err: unknown) => {
         console.error(`Something went wrong while trying to port forward pod ${podName}`, err);
       });
@@ -181,12 +147,6 @@ export class KubernetesInferenceManager extends RuntimeEngine<KubernetesInferenc
     Array.from(this.#proxies.keys()).forEach(id => this.clearProxy(id));
 
     this.#servers.clear();
-    this.#kubeConfigDisposable?.dispose();
-    this.#watchers.forEach(watcher => watcher.dispose());
-
-    this.#informer?.stop().catch(err => {
-      console.error('Something went wrong while trying to stop kubernetes informer', err);
-    });
   }
 
   override getServers(): InferenceServerInstance<KubernetesInferenceDetails>[] {
@@ -203,8 +163,8 @@ export class KubernetesInferenceManager extends RuntimeEngine<KubernetesInferenc
 
     // get the model id from annotation and use ModelManager to get corresponding ModelInfo
     let modelInfo: ModelInfo | undefined = undefined;
-    if (pod.metadata.annotations && AI_LAB_ANNOTATIONS.MODEL in pod.metadata.annotations) {
-      const modelId = pod.metadata.annotations[AI_LAB_ANNOTATIONS.MODEL];
+    if (pod.metadata.annotations && AI_LAB_INFERENCE_ANNOTATIONS.MODEL in pod.metadata.annotations) {
+      const modelId = pod.metadata.annotations[AI_LAB_INFERENCE_ANNOTATIONS.MODEL];
       modelInfo = this.modelManager.getModelInfo(modelId);
     }
 
@@ -233,15 +193,15 @@ export class KubernetesInferenceManager extends RuntimeEngine<KubernetesInferenc
     }
 
     let healthStatus: string | undefined;
-    if (pod.status && pod.status.containerStatuses && pod.status.containerStatuses.length === 1) {
+    if (pod.status?.containerStatuses && pod.status.containerStatuses.length === 1) {
       healthStatus = pod.status.containerStatuses[0].state?.running ? 'healthy' : undefined;
     }
 
     // we try to reuse the port provided when creating the inference server
-    // it has been saved to the AI_LAB_ANNOTATIONS.PORT annotation
+    // it has been saved to the AI_LAB_INFERENCE_ANNOTATIONS.PORT annotation
     let localPort: number | undefined = undefined;
-    if (pod.metadata.annotations && AI_LAB_ANNOTATIONS.PORT in pod.metadata.annotations) {
-      localPort = parseInt(pod.metadata.annotations[AI_LAB_ANNOTATIONS.PORT]);
+    if (pod.metadata.annotations && AI_LAB_INFERENCE_ANNOTATIONS.PORT in pod.metadata.annotations) {
+      localPort = parseInt(pod.metadata.annotations[AI_LAB_INFERENCE_ANNOTATIONS.PORT]);
     } else {
       throw new Error('pod has missing PORT annotation: cannot create a proxy');
     }

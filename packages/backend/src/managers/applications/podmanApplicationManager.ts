@@ -37,6 +37,7 @@ import {
 import type { PodmanApplicationProvider } from '../../workers/provider/application/PodmanApplicationProvider';
 import { ApplicationRuntimeEngine, type ApplicationState } from './ApplicationRuntimeEngine';
 import { RuntimeType } from '@shared/src/models/IInference';
+import type { ConfigurationRegistry } from '../../registries/ConfigurationRegistry';
 
 export interface PodmanApplicationDetails {
   podInfo: PodInfo,
@@ -56,13 +57,14 @@ export class PodmanApplicationManager extends ApplicationRuntimeEngine<PodmanApp
     private podManager: PodManager,
     recipeManager: RecipeManager,
     private podmanApplicationProvider: PodmanApplicationProvider,
+    configurationRegistry: ConfigurationRegistry,
   ) {
-    super('podman', RuntimeType.PODMAN, taskRegistry, catalogManager, recipeManager);
+    super('podman', RuntimeType.PODMAN, taskRegistry, catalogManager, recipeManager, configurationRegistry);
     this.#applications = new Map();
     this.#disposables = [];
   }
 
-  override async startApplication(recipe: Recipe, model: ModelInfo, labels: Record<string, string> = {}): Promise<void> {
+  override async startApplication(recipe: Recipe, model: ModelInfo, labels: Record<string, string> = {}): Promise<PodmanApplicationDetails> {
     // clear any existing status / tasks related to the pair recipeId-modelId.
     this.taskRegistry.deleteByLabels({
       'recipe-id': recipe.id,
@@ -83,6 +85,10 @@ export class PodmanApplicationManager extends ApplicationRuntimeEngine<PodmanApp
       // measure init + start time
       const durationSeconds = getDurationSecondsSince(startTime);
       this.telemetry.logUsage('recipe.pull', { 'recipe.id': recipe.id, 'recipe.name': recipe.name, durationSeconds });
+
+      return {
+        podInfo: podInfo,
+      };
     } catch (err: unknown) {
       const durationSeconds = getDurationSecondsSince(startTime);
       this.telemetry.logError('recipe.pull', {

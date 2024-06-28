@@ -47,7 +47,8 @@ export class BuilderManager implements Disposable {
     recipe: Recipe,
     containers: ContainerConfig[],
     configPath: string,
-    labels?: { [key: string]: string },
+    labels: { [key: string]: string } = {},
+    registry?: string,
   ): Promise<RecipeImage[]> {
     const containerTasks: { [key: string]: Task } = Object.fromEntries(
       containers.map(container => [
@@ -84,7 +85,7 @@ export class BuilderManager implements Disposable {
             throw new Error('Context configured does not exist.');
           }
 
-          const imageTag = getImageTag(recipe, container);
+          const imageTag = getImageTag(recipe, container, registry);
           const buildOptions: BuildImageOptions = {
             containerFile: container.containerfile,
             tag: imageTag,
@@ -138,7 +139,7 @@ export class BuilderManager implements Disposable {
     await Promise.all(
       containers.map(async container => {
         const task = containerTasks[container.name];
-        const imageTag = getImageTag(recipe, container);
+        const imageTag = getImageTag(recipe, container, registry);
 
         const image = images.find(im => {
           return im.RepoTags?.some(tag => tag.endsWith(imageTag));
@@ -150,10 +151,19 @@ export class BuilderManager implements Disposable {
           throw new Error(`no image found for ${container.name}:latest`);
         }
 
+        let imageName: string | undefined = undefined;
+        if(image.RepoTags && image.RepoTags.length > 0) {
+          if(registry) {
+            imageName = image.RepoTags.find(tag => tag.startsWith(registry)) ?? image.RepoTags[0];
+          } else {
+            imageName = image.RepoTags[0];
+          }
+        }
+
         imageInfoList.push({
           id: image.Id,
           engineId: image.engineId,
-          name: (image.RepoTags && image.RepoTags.length > 0 ? image.RepoTags[0] : undefined),
+          name: imageName,
           modelService: container.modelService,
           ports: container.ports?.map(p => `${p}`) ?? [],
           appName: container.name,

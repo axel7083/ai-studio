@@ -17,38 +17,18 @@
  ***********************************************************************/
 import { InferenceProvider } from './InferenceProvider';
 import type { V1PersistentVolumeClaim, V1Pod } from '@kubernetes/client-node';
-import { CoreV1Api, KubeConfig } from '@kubernetes/client-node';
-import { AI_LAB_ANNOTATIONS, DEFAULT_NAMESPACE } from '../../../managers/inference/kubernetesInferenceManager';
-import { kubernetes } from '@podman-desktop/api';
+import { AI_LAB_INFERENCE_ANNOTATIONS } from '../../../managers/inference/kubernetesInferenceManager';
 import type { TaskRegistry } from '../../../registries/TaskRegistry';
 import type { InferenceType } from '@shared/src/models/IInference';
 import { RuntimeType } from '@shared/src/models/IInference';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
 import { getRandomString } from '../../../utils/randomUtils';
-
-export function getKubeConfig(): KubeConfig {
-  const uri = kubernetes.getKubeconfig();
-  const config = new KubeConfig();
-  config.loadFromFile(uri.fsPath);
-  return config;
-}
-
-export function getLabels(): Record<string, string> {
-  return {
-    creator: 'podman-ai-lab',
-  };
-}
-
-export function getLabelSelector(): string {
-  return Object.entries(getLabels())
-    .map(([key, value]) => `${key}=${value}`)
-    .join(',');
-}
-
-export function getCoreV1Api(): CoreV1Api {
-  const config = getKubeConfig();
-  return config.makeApiClient(CoreV1Api);
-}
+import {
+  DEFAULT_NAMESPACE,
+  getCoreV1Api,
+  getLabels,
+  getLabelSelector,
+} from '../../../registries/KubernetesPodRegistry';
 
 export abstract class KubernetesInferenceProvider extends InferenceProvider<V1Pod> {
   protected constructor(
@@ -78,8 +58,8 @@ export abstract class KubernetesInferenceProvider extends InferenceProvider<V1Po
     return volumes.find(
       volume =>
         volume.metadata?.annotations &&
-        AI_LAB_ANNOTATIONS.MODEL in volume.metadata.annotations &&
-        volume.metadata.annotations[AI_LAB_ANNOTATIONS.MODEL] === modelId,
+        AI_LAB_INFERENCE_ANNOTATIONS.MODEL in volume.metadata.annotations &&
+        volume.metadata.annotations[AI_LAB_INFERENCE_ANNOTATIONS.MODEL] === modelId,
     );
   }
 
@@ -117,7 +97,7 @@ export abstract class KubernetesInferenceProvider extends InferenceProvider<V1Po
         name: `pvc-podman-ai-lab-${getRandomString()}`,
         labels: getLabels(),
         annotations: {
-          [AI_LAB_ANNOTATIONS.MODEL]: model.id,
+          [AI_LAB_INFERENCE_ANNOTATIONS.MODEL]: model.id,
         },
       },
       apiVersion: 'v1',

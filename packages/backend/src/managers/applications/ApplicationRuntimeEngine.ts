@@ -24,6 +24,7 @@ import { getRandomString } from '../../utils/randomUtils';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
 import type { CatalogManager } from '../catalogManager';
 import { RecipeManager } from '../recipes/RecipeManager';
+import { ConfigurationRegistry } from '../../registries/ConfigurationRegistry';
 
 export interface ApplicationState<T> {
   id: string; // unique identifier (usually the pod id)
@@ -51,6 +52,7 @@ export abstract class ApplicationRuntimeEngine<T> implements Disposable {
     protected taskRegistry: TaskRegistry,
     protected catalogManager: CatalogManager,
     protected recipeManager: RecipeManager,
+    protected configurationRegistry: ConfigurationRegistry,
   ) {
     this.id = id;
     this.runtime = runtime;
@@ -72,6 +74,7 @@ export abstract class ApplicationRuntimeEngine<T> implements Disposable {
         ...labels,
         'recipe-id': recipe.id,
       },
+      this.configurationRegistry.getExtensionConfiguration().imageRegistry,
     );
   }
 
@@ -111,5 +114,5 @@ export abstract class ApplicationRuntimeEngine<T> implements Disposable {
     return trackingId;
   }
 
-  abstract startApplication(recipe: Recipe, model: ModelInfo, labels: Record<string, string>): Promise<void>;
+  abstract startApplication(recipe: Recipe, model: ModelInfo, labels: Record<string, string>): Promise<T>;
 }

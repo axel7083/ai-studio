@@ -19,7 +19,10 @@
 import type { Recipe } from '@shared/src/models/IRecipe';
 import type { ContainerConfig } from '../models/AIConfig';
 
-export function getImageTag(recipe: Recipe, container: ContainerConfig) {
+export function getImageTag(recipe: Recipe, container: ContainerConfig, registry?: string) {
+  if(registry) {
+    return `${registry}:${recipe.id}-${container.name}`;
+  }
   let tag = container.image ?? `${recipe.id}-${container.name}`;
   if (!tag.includes(':')) {
     tag += ':latest';

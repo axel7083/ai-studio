@@ -53,6 +53,7 @@ import { PodmanApplicationProvider } from './workers/provider/application/Podman
 import { ApplicationEngineRegistry } from './registries/ApplicationEngineRegistry';
 import { KubernetesApplicationProvider } from './workers/provider/application/KubernetesApplicationProvider';
 import { KubernetesApplicationManager } from './managers/applications/kubernetesApplicationManager';
+import { KubernetesPodRegistry } from './registries/KubernetesPodRegistry';
 
 export class Studio {
   readonly #extensionContext: ExtensionContext;
@@ -98,6 +99,8 @@ export class Studio {
 
   #applicationEngineRegistry: ApplicationEngineRegistry | undefined;
   #inferenceProviderRegistry: InferenceProviderRegistry | undefined;
+
+  #kubernetesPodRegistry: KubernetesPodRegistry | undefined;
 
   constructor(readonly extensionContext: ExtensionContext) {
     this.#extensionContext = extensionContext;
@@ -259,9 +262,15 @@ export class Studio {
     this.#extensionContext.subscriptions.push(this.#applicationEngineRegistry);
 
     /**
+     * The Inference Provider registry stores all the InferenceProvider (aka backend) which
+     * can be used to create InferenceServers
+     */
+    this.#inferenceProviderRegistry = new InferenceProviderRegistry(this.#panel.webview);
+
+    /**
      * Responsible for deploying recipes to kubernetes environment
      */
-    this.#kubernetesApplicationProvider = new KubernetesApplicationProvider(this.#taskRegistry);
+    this.#kubernetesApplicationProvider = new KubernetesApplicationProvider(this.#taskRegistry, this.#inferenceProviderRegistry);
     this.#extensionContext.subscriptions.push(this.#kubernetesApplicationProvider);
 
     /**
@@ -274,6 +283,14 @@ export class Studio {
     this.#extensionContext.subscriptions.push(this.#podmanApplicationProvider);
 
     /**
+     * Informer for kubernetes pods
+     */
+    this.#kubernetesPodRegistry = new KubernetesPodRegistry();
+    this.#kubernetesPodRegistry.init();
+    this.#extensionContext.subscriptions.push(this.#kubernetesPodRegistry);
+
+
+    /**
      *  The KubernetesApplicationManager create, watch, manage the application pods deployed on kubernetes engine
      */
     this.#kubernetesApplicationManager = new KubernetesApplicationManager(
@@ -281,6 +298,8 @@ export class Studio {
       this.#taskRegistry,
       this.#catalogManager,
       this.#recipeManager,
+      this.#configurationRegistry,
+      this.#kubernetesPodRegistry,
     );
     this.#kubernetesApplicationManager.init();
     this.#extensionContext.subscriptions.push(this.#kubernetesApplicationManager);
@@ -298,16 +317,12 @@ export class Studio {
       this.#podManager,
       this.#recipeManager,
       this.#podmanApplicationProvider,
+      this.#configurationRegistry,
     );
     this.#podmanApplicationManager.init();
     this.#extensionContext.subscriptions.push(this.#podmanApplicationManager);
     this.#applicationEngineRegistry.register(this.#podmanApplicationManager);
 
-    /**
-     * The Inference Provider registry stores all the InferenceProvider (aka backend) which
-     * can be used to create InferenceServers
-     */
-    this.#inferenceProviderRegistry = new InferenceProviderRegistry(this.#panel.webview);
     this.#extensionContext.subscriptions.push(
       this.#inferenceProviderRegistry.register(new PodmanLlamaCppPython(this.#taskRegistry)),
     );
@@ -337,6 +352,7 @@ export class Studio {
       this.#taskRegistry,
       this.#modelsManager,
       this.#inferenceProviderRegistry,
+      this.#kubernetesPodRegistry,
     );
     this.#kubernetesInferenceManager.init();
     this.#extensionContext.subscriptions.push(this.#kubernetesInferenceManager);

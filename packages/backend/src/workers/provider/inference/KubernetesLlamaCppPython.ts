@@ -20,12 +20,16 @@ import type { V1Pod } from '@kubernetes/client-node';
 import { InferenceType } from '@shared/src/models/IInference';
 import { getRandomString } from '../../../utils/randomUtils';
 import { posix } from 'node:path';
-import { AI_LAB_ANNOTATIONS, DEFAULT_NAMESPACE } from '../../../managers/inference/kubernetesInferenceManager';
-import { getCoreV1Api, getLabels, KubernetesInferenceProvider } from './KubernetesInferenceProvider';
+import {
+  AI_LAB_INFERENCE_ANNOTATIONS,
+  AI_LAB_SERVICE_INFERENCE_LABEL,
+} from '../../../managers/inference/kubernetesInferenceManager';
+import { KubernetesInferenceProvider } from './KubernetesInferenceProvider';
 import type { TaskRegistry } from '../../../registries/TaskRegistry';
 import file from '../../../assets/kube-inference-init.sh?raw';
 import { getModelPropertiesEnvironmentVariables } from '../../../utils/modelsUtils';
 import { LLAMA_CPP_INFERENCE_IMAGE } from './PodmanLlamaCppPython';
+import { DEFAULT_NAMESPACE, getCoreV1Api, getLabels } from '../../../registries/KubernetesPodRegistry';
 
 export class KubernetesLlamaCppPython extends KubernetesInferenceProvider {
   constructor(taskRegistry: TaskRegistry) {
@@ -54,13 +58,16 @@ export class KubernetesLlamaCppPython extends KubernetesInferenceProvider {
 
     const environments = getModelPropertiesEnvironmentVariables(modelInfo);
 
-    const body: V1Pod = {
+    const podBody: V1Pod = {
       metadata: {
         name: `podman-ai-lab-inference-${getRandomString()}`,
-        labels: getLabels(),
+        labels: {
+          ...getLabels(),
+          [AI_LAB_SERVICE_INFERENCE_LABEL.MODEL]: modelInfo.id,
+        },
         annotations: {
-          [AI_LAB_ANNOTATIONS.MODEL]: modelInfo.id,
-          [AI_LAB_ANNOTATIONS.PORT]: `${config.port}`,
+          [AI_LAB_INFERENCE_ANNOTATIONS.MODEL]: modelInfo.id,
+          [AI_LAB_INFERENCE_ANNOTATIONS.PORT]: `${config.port}`,
         },
       },
       spec: {
@@ -148,9 +155,9 @@ export class KubernetesLlamaCppPython extends KubernetesInferenceProvider {
     };
 
     let result: { body: V1Pod };
-    const podTask = this.taskRegistry.createTask(`Creating pod ${body.metadata?.name}`, 'loading', config.labels);
+    const podTask = this.taskRegistry.createTask(`Creating pod ${podBody.metadata?.name}`, 'loading', config.labels);
     try {
-      result = await getCoreV1Api().createNamespacedPod(DEFAULT_NAMESPACE, body);
+      result = await getCoreV1Api().createNamespacedPod(DEFAULT_NAMESPACE, podBody);
       podTask.state = 'success';
     } catch (err: unknown) {
       podTask.state = 'error';

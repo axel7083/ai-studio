@@ -134,7 +134,8 @@ export class RecipeManager extends Publisher<RecipeImage[]> implements Disposabl
     });
   }
 
-  public async buildRecipe(recipe: Recipe, labels?: { [key: string]: string }): Promise<RecipeImage[]> {
+  public async buildRecipe(recipe: Recipe, labels?: { [key: string]: string }, registry?: string): Promise<RecipeImage[]> {
+    console.log('[RecipeManager] buildRecipe', registry);
     const localFolder = path.join(this.appUserDirectory, recipe.id);
 
     // load and parse the recipe configuration file and filter containers based on architecture
@@ -148,6 +149,7 @@ export class RecipeManager extends Publisher<RecipeImage[]> implements Disposabl
         ...labels,
         'recipe-id': recipe.id,
       },
+      registry,
     );
     this.requestRefresh();
     return images;
