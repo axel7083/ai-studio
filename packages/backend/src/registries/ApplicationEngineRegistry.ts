@@ -57,6 +57,7 @@ export class ApplicationEngineRegistry extends Publisher<ApplicationInfo[]> impl
   private toApplicationInfo(state: ApplicationState<unknown>): ApplicationInfo {
     return {
       id: state.id,
+      runtime: state.runtime,
       appPorts: state.appPorts,
       modelPorts: state.modelPorts,
       health: state.health,

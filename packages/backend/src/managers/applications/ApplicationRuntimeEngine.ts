@@ -19,14 +19,16 @@ import { type Disposable, type Event, EventEmitter, ProgressLocation, window } f
 import type { RuntimeType } from '@shared/src/models/IInference';
 import type { TaskRegistry } from '../../registries/TaskRegistry';
 import type { ApplicationStatus, PodHealth } from '@shared/src/models/IApplicationState';
-import type { Recipe, StartRecipeConfig } from '@shared/src/models/IRecipe';
+import type { Recipe, RecipeImage, StartRecipeConfig } from '@shared/src/models/IRecipe';
 import { getRandomString } from '../../utils/randomUtils';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
 import type { CatalogManager } from '../catalogManager';
+import { RecipeManager } from '../recipes/RecipeManager';
 
 export interface ApplicationState<T> {
   id: string; // unique identifier (usually the pod id)
 
+  runtime: RuntimeType,
   details: T,
   recipeId: string;
   modelId: string;
@@ -48,6 +50,7 @@ export abstract class ApplicationRuntimeEngine<T> implements Disposable {
     runtime: RuntimeType,
     protected taskRegistry: TaskRegistry,
     protected catalogManager: CatalogManager,
+    protected recipeManager: RecipeManager,
   ) {
     this.id = id;
     this.runtime = runtime;
@@ -61,6 +64,16 @@ export abstract class ApplicationRuntimeEngine<T> implements Disposable {
   abstract dispose(): void;
 
   abstract getApplication(): ApplicationState<T>[];
+
+  protected getBuildRecipeImage(recipe: Recipe, labels: Record<string, string>): Promise<RecipeImage[]> {
+    return this.recipeManager.buildRecipe(
+      recipe,
+      {
+        ...labels,
+        'recipe-id': recipe.id,
+      },
+    );
+  }
 
   public requestStart(config: StartRecipeConfig): string {
     const recipe = this.catalogManager.getRecipes().find(recipe => recipe.id === config.recipeId);

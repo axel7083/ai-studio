@@ -54,10 +54,10 @@ export class PodmanApplicationManager extends ApplicationRuntimeEngine<PodmanApp
     private modelsManager: ModelsManager,
     private telemetry: TelemetryLogger,
     private podManager: PodManager,
-    private recipeManager: RecipeManager,
+    recipeManager: RecipeManager,
     private podmanApplicationProvider: PodmanApplicationProvider,
   ) {
-    super('podman', RuntimeType.PODMAN, taskRegistry, catalogManager);
+    super('podman', RuntimeType.PODMAN, taskRegistry, catalogManager, recipeManager);
     this.#applications = new Map();
     this.#disposables = [];
   }
@@ -128,7 +128,7 @@ export class PodmanApplicationManager extends ApplicationRuntimeEngine<PodmanApp
     });
 
     // build all images, one per container (for a basic sample we should have 2 containers = sample app + model service)
-    const images = await this.recipeManager.buildRecipe(
+    const images = await this.getBuildRecipeImage(
       recipe,
       {
         ...labels,
@@ -321,6 +321,7 @@ export class PodmanApplicationManager extends ApplicationRuntimeEngine<PodmanApp
     }
     const state: ApplicationState<PodmanApplicationDetails> = {
       id: pod.Id,
+      runtime: RuntimeType.PODMAN,
       status: pod.Status === 'running' ? 'running' : 'error', // todo
       details: {
         podInfo: pod,

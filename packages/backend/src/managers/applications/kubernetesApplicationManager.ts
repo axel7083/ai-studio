@@ -26,6 +26,7 @@ import type { PodmanApplicationDetails } from './podmanApplicationManager';
 import type { CatalogManager } from '../catalogManager';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
 import type { Recipe } from '@shared/src/models/IRecipe';
+import type { RecipeManager } from '../recipes/RecipeManager';
 
 export interface KubernetesApplicationDetails {
   podInfo: V1Pod;
@@ -34,8 +35,13 @@ export interface KubernetesApplicationDetails {
 export class KubernetesApplicationManager extends ApplicationRuntimeEngine<KubernetesApplicationDetails> {
   #applications: ApplicationRegistry<ApplicationState<KubernetesApplicationDetails>>;
 
-  constructor(private kubernetesApplicationProvider: KubernetesApplicationProvider, taskRegistry: TaskRegistry, catalogManager: CatalogManager) {
-    super('kubernetes', RuntimeType.KUBERNETES, taskRegistry, catalogManager);
+  constructor(
+    private kubernetesApplicationProvider: KubernetesApplicationProvider,
+    taskRegistry: TaskRegistry,
+    catalogManager: CatalogManager,
+    recipeManager: RecipeManager,
+  ) {
+    super('kubernetes', RuntimeType.KUBERNETES, taskRegistry, catalogManager, recipeManager);
 
     this.#applications = new ApplicationRegistry<ApplicationState<PodmanApplicationDetails>>();
   }
@@ -43,11 +49,24 @@ export class KubernetesApplicationManager extends ApplicationRuntimeEngine<Kuber
   override init(): void {}
 
   override async startApplication(recipe: Recipe, model: ModelInfo, labels: Record<string, string>): Promise<void> {
+    console.log('[KubernetesApplicationManager] startApplication');
+
+    // clone recipe (or ensure it is cloned)
+    await this.recipeManager.cloneRecipe(recipe, { ...labels, 'model-id': model.id });
+
+    // build all images, one per container (for a basic sample we should have 2 containers = sample app + model service)
+    const images = await this.getBuildRecipeImage(recipe,
+      {
+        ...labels,
+        'recipe-id': recipe.id,
+        'model-id': model.id,
+      },
+    );
 
     await this.kubernetesApplicationProvider.perform({
       recipe: recipe,
       model: model,
-      images: [],
+      images: images,
       labels: labels,
       modelPath: 'TODO',
     });

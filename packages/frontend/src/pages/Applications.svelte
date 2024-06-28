@@ -11,12 +11,20 @@ import { onMount } from 'svelte';
 import { Table, TableColumn, TableRow, NavPage } from '@podman-desktop/ui-svelte';
 import TasksBanner from '/@/lib/progress/TasksBanner.svelte';
 import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
+import type { RuntimeType } from '@shared/src/models/IInference';
+import ColumnRuntime from '/@/lib/table/ColumnRuntime.svelte';
 
-const columns: TableColumn<ApplicationInfo>[] = [
+const columns = [
   new TableColumn<ApplicationInfo>('Status', { width: '70px', align: 'center', renderer: ColumnStatus }),
   new TableColumn<ApplicationInfo>('Model', { width: '3fr', renderer: ColumnModel }),
   new TableColumn<ApplicationInfo>('Recipe', { width: '2fr', renderer: ColumnRecipe }),
   new TableColumn<ApplicationInfo>('Pod', { width: '3fr', renderer: ColumnPod }),
+  new TableColumn<ApplicationInfo, RuntimeType>('Runtime', {
+    width: '90px',
+    renderer: ColumnRuntime,
+    renderMapping: (object) => object.runtime,
+    align: 'left',
+  }),
   new TableColumn<ApplicationInfo>('Age', { width: '2fr', renderer: ColumnAge }),
   new TableColumn<ApplicationInfo>('Actions', {
     align: 'right',

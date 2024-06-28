@@ -1,3 +1,5 @@
+import type { RuntimeType } from './IInference';
+
 /**********************************************************************
  * Copyright (C) 2024 Red Hat, Inc.
  *
@@ -21,6 +23,7 @@ export type ApplicationStatus = 'stopped' | 'running' | 'deleting' | 'stopping' 
 
 export interface ApplicationInfo {
   id: string;
+  runtime: RuntimeType,
   status: ApplicationStatus;
   recipeId: string;
   modelId: string;
