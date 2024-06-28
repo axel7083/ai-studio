@@ -16,94 +16,53 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { Recipe, RecipeImage } from '@shared/src/models/IRecipe';
-import * as path from 'node:path';
-import { containerEngine, Disposable, ProgressLocation, window } from '@podman-desktop/api';
-import type {
-  PodCreatePortOptions,
-  TelemetryLogger,
-  PodInfo,
-  Webview,
-  HostConfig,
-  HealthConfig,
-  PodContainerInfo,
-} from '@podman-desktop/api';
+import type { Recipe } from '@shared/src/models/IRecipe';
+import type { PodContainerInfo, PodInfo, TelemetryLogger } from '@podman-desktop/api';
+import { containerEngine, Disposable } from '@podman-desktop/api';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
-import type { ModelsManager } from './modelsManager';
-import { getPortsFromLabel, getPortsInfo } from '../utils/ports';
-import { getDurationSecondsSince, timeout } from '../utils/utils';
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
-import type { PodmanConnection } from './podmanConnection';
-import { Messages } from '@shared/Messages';
-import type { CatalogManager } from './catalogManager';
-import { ApplicationRegistry } from '../registries/ApplicationRegistry';
-import type { TaskRegistry } from '../registries/TaskRegistry';
-import { Publisher } from '../utils/Publisher';
-import { isQEMUMachine } from '../utils/podman';
-import { getModelPropertiesForEnvironment } from '../utils/modelsUtils';
-import { getRandomName, getRandomString } from '../utils/randomUtils';
-import type { PodManager } from './recipes/PodManager';
-import { SECOND } from '../workers/provider/PodmanLlamaCppPython';
-import type { RecipeManager } from './recipes/RecipeManager';
+import type { ModelsManager } from '../modelsManager';
+import { getPortsFromLabel } from '../../utils/ports';
+import { getDurationSecondsSince, timeout } from '../../utils/utils';
+import type { PodmanConnection } from '../podmanConnection';
+import type { CatalogManager } from '../catalogManager';
+import type { TaskRegistry } from '../../registries/TaskRegistry';
+import type { PodManager } from '../recipes/PodManager';
+import type { RecipeManager } from '../recipes/RecipeManager';
 import {
   POD_LABEL_APP_PORTS,
   POD_LABEL_MODEL_ID,
   POD_LABEL_MODEL_PORTS,
   POD_LABEL_RECIPE_ID,
-} from '../utils/RecipeConstants';
+} from '../../utils/RecipeConstants';
+import type { PodmanApplicationProvider } from '../../workers/provider/application/PodmanApplicationProvider';
+import { ApplicationRuntimeEngine, type ApplicationState } from './ApplicationRuntimeEngine';
+import { RuntimeType } from '@shared/src/models/IInference';
 
-export class ApplicationManager extends Publisher<ApplicationState[]> implements Disposable {
-  #applications: ApplicationRegistry<ApplicationState>;
+export interface PodmanApplicationDetails {
+  podInfo: PodInfo,
+}
+
+export class PodmanApplicationManager extends ApplicationRuntimeEngine<PodmanApplicationDetails> {
+  #applications: Map<string, ApplicationState<PodmanApplicationDetails>>;
   protectTasks: Set<string> = new Set();
   #disposables: Disposable[];
 
   constructor(
-    private taskRegistry: TaskRegistry,
-    webview: Webview,
+    taskRegistry: TaskRegistry,
     private podmanConnection: PodmanConnection,
-    private catalogManager: CatalogManager,
+    catalogManager: CatalogManager,
     private modelsManager: ModelsManager,
     private telemetry: TelemetryLogger,
     private podManager: PodManager,
     private recipeManager: RecipeManager,
+    private podmanApplicationProvider: PodmanApplicationProvider,
   ) {
-    super(webview, Messages.MSG_APPLICATIONS_STATE_UPDATE, () => this.getApplicationsState());
-    this.#applications = new ApplicationRegistry<ApplicationState>();
+    super('podman', RuntimeType.PODMAN, taskRegistry, catalogManager);
+    this.#applications = new Map();
     this.#disposables = [];
   }
 
-  async requestPullApplication(recipe: Recipe, model: ModelInfo): Promise<string> {
-    // create a tracking id to put in the labels
-    const trackingId: string = getRandomString();
-
-    const labels: Record<string, string> = {
-      trackingId: trackingId,
-    };
-
-    const task = this.taskRegistry.createTask(`Pulling ${recipe.name} recipe`, 'loading', {
-      ...labels,
-      'recipe-pulling': recipe.id, // this label should only be on the master task
-    });
-
-    window
-      .withProgress({ location: ProgressLocation.TASK_WIDGET, title: `Pulling ${recipe.name}.` }, () =>
-        this.pullApplication(recipe, model, labels),
-      )
-      .then(() => {
-        task.state = 'success';
-      })
-      .catch((err: unknown) => {
-        task.state = 'error';
-        task.error = `Something went wrong while pulling ${recipe.name}: ${String(err)}`;
-      })
-      .finally(() => {
-        this.taskRegistry.updateTask(task);
-      });
-
-    return trackingId;
-  }
-
-  async pullApplication(recipe: Recipe, model: ModelInfo, labels: Record<string, string> = {}): Promise<void> {
+  override async startApplication(recipe: Recipe, model: ModelInfo, labels: Record<string, string> = {}): Promise<void> {
     // clear any existing status / tasks related to the pair recipeId-modelId.
     this.taskRegistry.deleteByLabels({
       'recipe-id': recipe.id,
@@ -147,6 +106,7 @@ export class ApplicationManager extends Publisher<ApplicationState[]> implements
    * - build containers
    * - create pod
    *
+   * @param runtime
    * @param recipe
    * @param model
    * @param labels
@@ -167,13 +127,6 @@ export class ApplicationManager extends Publisher<ApplicationState[]> implements
       'model-id': model.id,
     });
 
-    // upload model to podman machine if user system is supported
-    const modelPath = await this.modelsManager.uploadModelToPodmanMachine(model, {
-      ...labels,
-      'recipe-id': recipe.id,
-      'model-id': model.id,
-    });
-
     // build all images, one per container (for a basic sample we should have 2 containers = sample app + model service)
     const images = await this.recipeManager.buildRecipe(
       recipe,
@@ -184,16 +137,28 @@ export class ApplicationManager extends Publisher<ApplicationState[]> implements
       },
     );
 
+    // upload model to podman machine if user system is supported
+    const modelPath = await this.modelsManager.uploadModelToPodmanMachine(model, {
+      ...labels,
+      'recipe-id': recipe.id,
+      'model-id': model.id,
+    });
+
     // first delete any existing pod with matching labels
     if (await this.hasApplicationPod(recipe.id, model.id)) {
       await this.removeApplication(recipe.id, model.id);
     }
 
-    // create a pod containing all the containers to run the application
-    return this.createApplicationPod(recipe, model, images, modelPath, {
-      ...labels,
-      'recipe-id': recipe.id,
-      'model-id': model.id,
+    return this.podmanApplicationProvider.perform({
+      recipe: recipe,
+      model: model,
+      images: images,
+      modelPath: modelPath,
+      labels: {
+        ...labels,
+        'recipe-id': recipe.id,
+        'model-id': model.id,
+      },
     });
   }
 
@@ -236,169 +201,13 @@ export class ApplicationManager extends Publisher<ApplicationState[]> implements
     throw new Error(`Container ${container.Id} not started in time`);
   }
 
-  async createApplicationPod(
-    recipe: Recipe,
-    model: ModelInfo,
-    images: RecipeImage[],
-    modelPath: string,
-    labels?: { [key: string]: string },
-  ): Promise<PodInfo> {
-    const task = this.taskRegistry.createTask('Creating AI App', 'loading', labels);
-
-    // create empty pod
-    let podInfo: PodInfo;
-    try {
-      podInfo = await this.createPod(recipe, model, images);
-      task.labels = {
-        ...task.labels,
-        'pod-id': podInfo.Id,
-      };
-    } catch (e) {
-      console.error('error when creating pod', e);
-      task.state = 'error';
-      task.error = `Something went wrong while creating pod: ${String(e)}`;
-      throw e;
-    } finally {
-      this.taskRegistry.updateTask(task);
-    }
-
-    try {
-      await this.createContainerAndAttachToPod(podInfo, images, model, modelPath);
-      task.state = 'success';
-    } catch (e) {
-      console.error(`error when creating pod ${podInfo.Id}`, e);
-      task.state = 'error';
-      task.error = `Something went wrong while creating pod: ${String(e)}`;
-      throw e;
-    } finally {
-      this.taskRegistry.updateTask(task);
-    }
-
-    return podInfo;
-  }
-
-  async createContainerAndAttachToPod(
-    podInfo: PodInfo,
-    images: RecipeImage[],
-    modelInfo: ModelInfo,
-    modelPath: string,
-  ): Promise<void> {
-    // temporary check to set Z flag or not - to be removed when switching to podman 5
-    const isQEMUVM = await isQEMUMachine();
-    await Promise.all(
-      images.map(async image => {
-        let hostConfig: HostConfig | undefined = undefined;
-        let envs: string[] = [];
-        let healthcheck: HealthConfig | undefined = undefined;
-        // if it's a model service we mount the model as a volume
-        if (image.modelService) {
-          const modelName = path.basename(modelPath);
-          hostConfig = {
-            Mounts: [
-              {
-                Target: `/${modelName}`,
-                Source: modelPath,
-                Type: 'bind',
-                Mode: isQEMUVM ? undefined : 'Z',
-              },
-            ],
-          };
-          envs = [`MODEL_PATH=/${modelName}`];
-          envs.push(...getModelPropertiesForEnvironment(modelInfo));
-        } else {
-          // TODO: remove static port
-          const modelService = images.find(image => image.modelService);
-          if (modelService && modelService.ports.length > 0) {
-            const endPoint = `http://localhost:${modelService.ports[0]}`;
-            envs = [`MODEL_ENDPOINT=${endPoint}`];
-          }
-        }
-        if (image.ports.length > 0) {
-          healthcheck = {
-            // must be the port INSIDE the container not the exposed one
-            Test: ['CMD-SHELL', `curl -s localhost:${image.ports[0]} > /dev/null`],
-            Interval: SECOND * 5,
-            Retries: 4 * 5,
-            Timeout: SECOND * 2,
-          };
-        }
-
-        const podifiedName = getRandomName(`${image.appName}-podified`);
-        await containerEngine.createContainer(podInfo.engineId, {
-          Image: image.id,
-          name: podifiedName,
-          Detach: true,
-          HostConfig: hostConfig,
-          Env: envs,
-          start: false,
-          pod: podInfo.Id,
-          HealthCheck: healthcheck,
-        });
-      }),
-    );
-  }
-
-  async createPod(recipe: Recipe, model: ModelInfo, images: RecipeImage[]): Promise<PodInfo> {
-    // find the exposed port of the sample app so we can open its ports on the new pod
-    const sampleAppImageInfo = images.find(image => !image.modelService);
-    if (!sampleAppImageInfo) {
-      console.error('no sample app image found');
-      throw new Error('no sample app found');
-    }
-
-    const portmappings: PodCreatePortOptions[] = [];
-    // we expose all ports so we can check the model service if it is actually running
-    for (const image of images) {
-      for (const exposed of image.ports) {
-        const localPorts = await getPortsInfo(exposed);
-        if (localPorts) {
-          portmappings.push({
-            container_port: parseInt(exposed),
-            host_port: parseInt(localPorts),
-            host_ip: '',
-            protocol: '',
-            range: 1,
-          });
-        }
-      }
-    }
-
-    // create new pod
-    const labels: Record<string, string> = {
-      [POD_LABEL_RECIPE_ID]: recipe.id,
-      [POD_LABEL_MODEL_ID]: model.id,
-    };
-    // collecting all modelService ports
-    const modelPorts = images
-      .filter(img => img.modelService)
-      .flatMap(img => img.ports)
-      .map(port => portmappings.find(pm => `${pm.container_port}` === port)?.host_port);
-    if (modelPorts.length) {
-      labels[POD_LABEL_MODEL_PORTS] = modelPorts.join(',');
-    }
-    // collecting all application ports (excluding service ports)
-    const appPorts = images
-      .filter(img => !img.modelService)
-      .flatMap(img => img.ports)
-      .map(port => portmappings.find(pm => `${pm.container_port}` === port)?.host_port);
-    if (appPorts.length) {
-      labels[POD_LABEL_APP_PORTS] = appPorts.join(',');
-    }
-    const { engineId, Id } = await this.podManager.createPod({
-      name: getRandomName(`pod-${sampleAppImageInfo.appName}`),
-      portmappings: portmappings,
-      labels,
-    });
-
-    return this.podManager.getPod(engineId, Id);
-  }
 
   /**
    * Stop the pod with matching recipeId and modelId
    * @param recipeId
    * @param modelId
    */
-  async stopApplication(recipeId: string, modelId: string): Promise<PodInfo> {
+  async stopPodApplication(recipeId: string, modelId: string): Promise<PodInfo> {
     // clear existing tasks
     this.clearTasks(recipeId, modelId);
 
@@ -436,7 +245,7 @@ export class ApplicationManager extends Publisher<ApplicationState[]> implements
    * @param recipeId
    * @param modelId
    */
-  async startApplication(recipeId: string, modelId: string): Promise<void> {
+  async startPodApplication(recipeId: string, modelId: string): Promise<void> {
     this.clearTasks(recipeId, modelId);
     const pod = await this.getApplicationPod(recipeId, modelId);
 
@@ -461,10 +270,9 @@ export class ApplicationManager extends Publisher<ApplicationState[]> implements
 
     this.podmanConnection.onMachineStop(() => {
       // Podman Machine has been stopped, we consider all recipe pods are stopped
-      for (const recipeModelIndex of this.#applications.keys()) {
+      for (const key of this.#applications.keys()) {
         this.taskRegistry.createTask('AI App stopped manually', 'success', {
-          'recipe-id': recipeModelIndex.recipeId,
-          'model-id': recipeModelIndex.modelId,
+          'application-id': key,
         });
       }
 
@@ -508,39 +316,41 @@ export class ApplicationManager extends Publisher<ApplicationState[]> implements
     }
     const appPorts = getPortsFromLabel(pod.Labels, POD_LABEL_APP_PORTS);
     const modelPorts = getPortsFromLabel(pod.Labels, POD_LABEL_MODEL_PORTS);
-    if (this.#applications.has({ recipeId, modelId })) {
+    if (this.#applications.has(pod.Id)) {
       return;
     }
-    const state: ApplicationState = {
-      recipeId,
+    const state: ApplicationState<PodmanApplicationDetails> = {
+      id: pod.Id,
+      status: pod.Status === 'running' ? 'running' : 'error', // todo
+      details: {
+        podInfo: pod,
+      },
+      recipeId: recipeId,
       modelId,
-      pod,
       appPorts,
       modelPorts,
       health: 'starting',
     };
-    this.updateApplicationState(recipeId, modelId, state);
+    this.updateApplicationState(state);
   }
 
   private forgetPodById(podId: string) {
-    const app = Array.from(this.#applications.values()).find(p => p.pod.Id === podId);
+    const app = this.#applications.get(podId);
     if (!app) {
       return;
     }
-    if (!app.pod.Labels) {
+
+    this.#applications.delete(podId);
+    this.notify();
+
+    if (!app.details.podInfo.Labels) {
       return;
     }
-    const recipeId = app.pod.Labels[POD_LABEL_RECIPE_ID];
-    const modelId = app.pod.Labels[POD_LABEL_MODEL_ID];
+    const recipeId = app.details.podInfo.Labels[POD_LABEL_RECIPE_ID];
+    const modelId = app.details.podInfo.Labels[POD_LABEL_MODEL_ID];
     if (!recipeId || !modelId) {
       return;
     }
-    if (!this.#applications.has({ recipeId, modelId })) {
-      return;
-    }
-    this.#applications.delete({ recipeId, modelId });
-    this.notify();
-
     const protect = this.protectTasks.has(podId);
     if (!protect) {
       this.taskRegistry.createTask('AI App stopped manually', 'success', {
@@ -557,37 +367,34 @@ export class ApplicationManager extends Publisher<ApplicationState[]> implements
     let changes = false;
 
     for (const pod of pods) {
-      const recipeId = pod.Labels[POD_LABEL_RECIPE_ID];
-      const modelId = pod.Labels[POD_LABEL_MODEL_ID];
-      if (!this.#applications.has({ recipeId, modelId })) {
-        // a fresh pod could not have been added yet, we will handle it at next iteration
-        continue;
-      }
+      const state = this.#applications.get(pod.Id);
+      if(!state) continue;
 
       const podHealth = await this.podManager.getHealth(pod);
-      const state = this.#applications.get({ recipeId, modelId });
-      if (state.health !== podHealth) {
+
+      if (state && state.health !== podHealth) {
         state.health = podHealth;
-        state.pod = pod;
-        this.#applications.set({ recipeId, modelId }, state);
+        state.details.podInfo = pod;
+        this.#applications.set(pod.Id, state);
         changes = true;
       }
-      if (pod.Status !== state.pod.Status) {
-        state.pod = pod;
+      if (pod.Status !== state.details.podInfo.Status) {
+        state.details.podInfo = pod;
         changes = true;
       }
     }
+
     if (changes) {
       this.notify();
     }
   }
 
-  updateApplicationState(recipeId: string, modelId: string, state: ApplicationState): void {
-    this.#applications.set({ recipeId, modelId }, state);
+  updateApplicationState(state: ApplicationState<PodmanApplicationDetails>): void {
+    this.#applications.set(state.details.podInfo.Id, state);
     this.notify();
   }
 
-  getApplicationsState(): ApplicationState[] {
+  override getApplication(): ApplicationState<PodmanApplicationDetails>[] {
     return Array.from(this.#applications.values());
   }
 
@@ -605,7 +412,7 @@ export class ApplicationManager extends Publisher<ApplicationState[]> implements
    * @param modelId
    */
   async removeApplication(recipeId: string, modelId: string): Promise<void> {
-    const appPod = await this.stopApplication(recipeId, modelId);
+    const appPod = await this.stopPodApplication(recipeId, modelId);
 
     const remoteTask = this.taskRegistry.createTask(`Removing AI App`, 'loading', {
       'recipe-id': recipeId,
@@ -643,13 +450,12 @@ export class ApplicationManager extends Publisher<ApplicationState[]> implements
     });
   }
 
-  async getApplicationPorts(recipeId: string, modelId: string): Promise<number[]> {
-    const recipe = this.catalogManager.getRecipeById(recipeId);
-    const state = this.#applications.get({ recipeId, modelId });
+  async getApplicationPorts(applicationId: string): Promise<number[]> {
+    const state = this.#applications.get(applicationId);
     if (state) {
       return state.appPorts;
     }
-    throw new Error(`Recipe ${recipe.name} has no ports available`);
+    throw new Error(`Cannot find application port for application id ${applicationId}`);
   }
 
   async getApplicationPod(recipeId: string, modelId: string): Promise<PodInfo> {

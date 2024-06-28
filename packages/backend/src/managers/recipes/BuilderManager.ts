@@ -152,6 +152,8 @@ export class BuilderManager implements Disposable {
 
         imageInfoList.push({
           id: image.Id,
+          engineId: image.engineId,
+          name: (image.RepoTags && image.RepoTags.length > 0 ? image.RepoTags[0] : undefined),
           modelService: container.modelService,
           ports: container.ports?.map(p => `${p}`) ?? [],
           appName: container.name,

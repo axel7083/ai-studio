@@ -1,7 +1,7 @@
 <script lang="ts">
 import ApplicationActions from '../../ApplicationActions.svelte';
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
-export let object: ApplicationState;
+import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
+export let object: ApplicationInfo;
 </script>
 
 <ApplicationActions

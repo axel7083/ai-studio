@@ -26,7 +26,7 @@ import type {
 } from '@podman-desktop/api';
 import { RpcExtension } from '@shared/src/messages/MessageProxy';
 import { StudioApiImpl } from './studio-api-impl';
-import { ApplicationManager } from './managers/applicationManager';
+import { PodmanApplicationManager } from './managers/applications/podmanApplicationManager';
 import { GitManager } from './managers/gitManager';
 import { TaskRegistry } from './registries/TaskRegistry';
 import { CatalogManager } from './managers/catalogManager';
@@ -42,13 +42,17 @@ import { engines } from '../package.json';
 import { BuilderManager } from './managers/recipes/BuilderManager';
 import { PodManager } from './managers/recipes/PodManager';
 import { initWebview } from './webviewUtils';
-import { PodmanLlamaCppPython } from './workers/provider/PodmanLlamaCppPython';
+import { PodmanLlamaCppPython } from './workers/provider/inference/PodmanLlamaCppPython';
 import { InferenceProviderRegistry } from './registries/InferenceProviderRegistry';
 import { InferenceServerRegistry } from './registries/InferenceServerRegistry';
 import { KubernetesInferenceManager } from './managers/inference/kubernetesInferenceManager';
-import { KubernetesLlamaCppPython } from './workers/provider/KubernetesLlamaCppPython';
+import { KubernetesLlamaCppPython } from './workers/provider/inference/KubernetesLlamaCppPython';
 import { ConfigurationRegistry } from './registries/ConfigurationRegistry';
 import { RecipeManager } from './managers/recipes/RecipeManager';
+import { PodmanApplicationProvider } from './workers/provider/application/PodmanApplicationProvider';
+import { ApplicationEngineRegistry } from './registries/ApplicationEngineRegistry';
+import { KubernetesApplicationProvider } from './workers/provider/application/KubernetesApplicationProvider';
+import { KubernetesApplicationManager } from './managers/applications/kubernetesApplicationManager';
 
 export class Studio {
   readonly #extensionContext: ExtensionContext;
@@ -81,11 +85,19 @@ export class Studio {
   #cancellationTokenRegistry: CancellationTokenRegistry | undefined;
   #snippetManager: SnippetManager | undefined;
   #playgroundManager: PlaygroundV2Manager | undefined;
+  #configurationRegistry: ConfigurationRegistry | undefined;
 
   #recipeManager: RecipeManager | undefined;
-  #applicationManager: ApplicationManager | undefined;
+  // application engines
+  #podmanApplicationManager: PodmanApplicationManager | undefined;
+  #kubernetesApplicationManager: KubernetesApplicationManager | undefined;
+
+  // application providers
+  #podmanApplicationProvider: PodmanApplicationProvider | undefined;
+  #kubernetesApplicationProvider: KubernetesApplicationProvider | undefined;
+
+  #applicationEngineRegistry: ApplicationEngineRegistry | undefined;
   #inferenceProviderRegistry: InferenceProviderRegistry | undefined;
-  #configurationRegistry: ConfigurationRegistry | undefined;
 
   constructor(readonly extensionContext: ExtensionContext) {
     this.#extensionContext = extensionContext;
@@ -241,20 +253,54 @@ export class Studio {
     this.#extensionContext.subscriptions.push(this.#recipeManager);
 
     /**
-     * The application manager is managing the Recipes
+     * The application engine registry hold the application engines
      */
-    this.#applicationManager = new ApplicationManager(
+    this.#applicationEngineRegistry = new ApplicationEngineRegistry(this.#panel.webview);
+    this.#extensionContext.subscriptions.push(this.#applicationEngineRegistry);
+
+    /**
+     * Responsible for deploying recipes to kubernetes environment
+     */
+    this.#kubernetesApplicationProvider = new KubernetesApplicationProvider(this.#taskRegistry);
+    this.#extensionContext.subscriptions.push(this.#kubernetesApplicationProvider);
+
+    /**
+     * Responsible for deploying recipes to podman environment
+     */
+    this.#podmanApplicationProvider = new PodmanApplicationProvider(
+      this.#podManager,
       this.#taskRegistry,
-      this.#panel.webview,
+    );
+    this.#extensionContext.subscriptions.push(this.#podmanApplicationProvider);
+
+    /**
+     *  The KubernetesApplicationManager create, watch, manage the application pods deployed on kubernetes engine
+     */
+    this.#kubernetesApplicationManager = new KubernetesApplicationManager(
+      this.#kubernetesApplicationProvider,
+      this.#taskRegistry,
+      this.#catalogManager,
+    );
+    this.#kubernetesApplicationManager.init();
+    this.#extensionContext.subscriptions.push(this.#kubernetesApplicationManager);
+    this.#applicationEngineRegistry.register(this.#kubernetesApplicationManager);
+
+    /**
+     *  The PodmanApplicationProvider create, watch, manage the application pods deployed on podman engine
+     */
+    this.#podmanApplicationManager = new PodmanApplicationManager(
+      this.#taskRegistry,
       this.#podmanConnection,
       this.#catalogManager,
       this.#modelsManager,
       this.#telemetry,
       this.#podManager,
       this.#recipeManager,
+      this.#podmanApplicationProvider,
     );
-    this.#applicationManager.init();
-    this.#extensionContext.subscriptions.push(this.#applicationManager);
+    this.#podmanApplicationManager.init();
+    this.#extensionContext.subscriptions.push(this.#podmanApplicationManager);
+    this.#applicationEngineRegistry.register(this.#podmanApplicationManager);
 
     /**
      * The Inference Provider registry stores all the InferenceProvider (aka backend) which
@@ -325,7 +371,7 @@ export class Studio {
      * The StudioApiImpl is the implementation of our API between backend and frontend
      */
     this.#studioApi = new StudioApiImpl(
-      this.#applicationManager,
+      this.#applicationEngineRegistry,
       this.#catalogManager,
       this.#modelsManager,
       this.#telemetry,

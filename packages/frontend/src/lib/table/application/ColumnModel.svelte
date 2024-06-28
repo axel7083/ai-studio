@@ -1,10 +1,11 @@
 <script lang="ts">
-import type { ApplicationState } from '@shared/src/models/IApplicationState';
+  import type { ApplicationInfo } from '@shared/src/models/IApplicationState';
 import { catalog } from '/@/stores/catalog';
 import { displayPorts } from '/@/utils/printers';
 
-export let object: ApplicationState;
+export let object: ApplicationInfo;
 
+let name: string | undefined;
 $: name = $catalog.models.find(r => r.id === object.modelId)?.name;
 </script>
 

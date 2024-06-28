@@ -19,7 +19,7 @@ import { Publisher } from '../utils/Publisher';
 import { Disposable, type Webview } from '@podman-desktop/api';
 import { Messages } from '@shared/Messages';
 import type { InferenceType, RuntimeType } from '@shared/src/models/IInference';
-import type { InferenceProvider } from '../workers/provider/InferenceProvider';
+import type { InferenceProvider } from '../workers/provider/inference/InferenceProvider';
 
 export class InferenceProviderRegistry extends Publisher<string[]> {
   #providers: Map<RuntimeType, InferenceProvider<unknown>[]>;

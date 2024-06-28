@@ -19,10 +19,10 @@
 import type { ModelCheckerInfo, ModelInfo } from './models/IModelInfo';
 import type { ApplicationCatalog } from './models/IApplicationCatalog';
 import type { OpenDialogOptions, TelemetryTrustedValue, Uri } from '@podman-desktop/api';
-import type { ApplicationState } from './models/IApplicationState';
+import type { ApplicationInfo } from './models/IApplicationState';
 import type { Task } from './models/ITask';
 import type { LocalRepository } from './models/ILocalRepository';
-import type { InferenceServerInfo } from './models/IInference';
+import { type InferenceServerInfo } from './models/IInference';
 import type { RequestOptions } from './models/RequestOptions';
 import type { Language } from 'postman-code-generators';
 import type { CreationInferenceServerOptions } from './models/InferenceServerConfig';
@@ -30,7 +30,7 @@ import type { ModelOptions } from './models/IModelOptions';
 import type { Conversation } from './models/IPlaygroundMessage';
 import type { LocalModelImportInfo } from './models/ILocalModelInfo';
 import type { ContainerConnectionInfo } from './models/IContainerConnectionInfo';
-import type { RecipeImage } from './models/IRecipe';
+import type { RecipeImage, StartRecipeConfig } from './models/IRecipe';
 import type { ExtensionConfiguration } from './models/IExtensionConfiguration';
 
 export abstract class StudioAPI {
@@ -46,18 +46,35 @@ export abstract class StudioAPI {
 
   /**
    * Pull an application (clone, download model, build container, start pod)
-   * @param recipeId
-   * @param modelId
    *
    * @return a promise with a tracking id used in each task labels
+   * @param config
    */
-  abstract requestPullApplication(recipeId: string, modelId: string): Promise<string>;
+  abstract requestPullApplication(config: StartRecipeConfig): Promise<string>;
+
+  /**
+   * @deprecated
+   */
   abstract requestStopApplication(recipeId: string, modelId: string): Promise<void>;
-  abstract requestStartApplication(recipeId: string, modelId: string): Promise<void>;
+  /**
+   * @deprecated
+   */
+  abstract requestStartPodApplication(recipeId: string, modelId: string): Promise<void>;
+  /**
+   * @deprecated
+   */
   abstract requestRemoveApplication(recipeId: string, modelId: string): Promise<void>;
+  /**
+   * @deprecated
+   */
   abstract requestRestartApplication(recipeId: string, modelId: string): Promise<void>;
+  /**
+   * @deprecated
+   */
   abstract requestOpenApplication(recipeId: string, modelId: string): Promise<void>;
-  abstract getApplicationsState(): Promise<ApplicationState[]>;
+
+
+  abstract getApplicationInfo(): Promise<ApplicationInfo[]>;
 
   abstract openURL(url: string): Promise<boolean>;
   abstract openFile(file: string, recipeId?: string): Promise<boolean>;

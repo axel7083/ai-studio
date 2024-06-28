@@ -30,7 +30,7 @@ import {
   getKubeConfig,
   getLabelSelector,
   KubernetesInferenceProvider,
-} from '../../workers/provider/KubernetesInferenceProvider';
+} from '../../workers/provider/inference/KubernetesInferenceProvider';
 import { getInferenceType } from '../../utils/inferenceUtils';
 import { InferenceProviderRegistry } from '../../registries/InferenceProviderRegistry';
 

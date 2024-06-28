@@ -18,13 +18,13 @@
 import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import type { V1Pod } from '@kubernetes/client-node';
 import { InferenceType } from '@shared/src/models/IInference';
-import { getRandomString } from '../../utils/randomUtils';
+import { getRandomString } from '../../../utils/randomUtils';
 import { posix } from 'node:path';
-import { AI_LAB_ANNOTATIONS, DEFAULT_NAMESPACE } from '../../managers/inference/kubernetesInferenceManager';
+import { AI_LAB_ANNOTATIONS, DEFAULT_NAMESPACE } from '../../../managers/inference/kubernetesInferenceManager';
 import { getCoreV1Api, getLabels, KubernetesInferenceProvider } from './KubernetesInferenceProvider';
-import type { TaskRegistry } from '../../registries/TaskRegistry';
-import file from '../../assets/kube-inference-init.sh?raw';
-import { getModelPropertiesEnvironmentVariables } from '../../utils/modelsUtils';
+import type { TaskRegistry } from '../../../registries/TaskRegistry';
+import file from '../../../assets/kube-inference-init.sh?raw';
+import { getModelPropertiesEnvironmentVariables } from '../../../utils/modelsUtils';
 import { LLAMA_CPP_INFERENCE_IMAGE } from './PodmanLlamaCppPython';
 
 export class KubernetesLlamaCppPython extends KubernetesInferenceProvider {

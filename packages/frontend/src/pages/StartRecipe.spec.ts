@@ -280,7 +280,7 @@ test('Selecting model should enable submit button', async () => {
   expect(button).not.toBeDisabled();
 });
 
-test('Submit button should call requestPullApplication with proper arguments', async () => {
+test('Submit button should call requestStartRecipe with proper arguments', async () => {
   const { container } = render(StartRecipe, {
     recipeId: 'dummy-recipe-id',
   });

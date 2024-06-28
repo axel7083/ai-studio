@@ -31,7 +31,7 @@ import { LABEL_INFERENCE_SERVER } from '../../utils/inferenceUtils';
 import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import type { TaskRegistry } from '../../registries/TaskRegistry';
 import type { InferenceProviderRegistry } from '../../registries/InferenceProviderRegistry';
-import type { PodmanInferenceProvider } from '../../workers/provider/PodmanInferenceProvider';
+import type { PodmanInferenceProvider } from '../../workers/provider/inference/PodmanInferenceProvider';
 import type { CatalogManager } from '../catalogManager';
 import { RuntimeType } from '@shared/src/models/IInference';
 

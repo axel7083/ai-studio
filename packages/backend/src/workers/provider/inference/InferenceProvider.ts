@@ -15,39 +15,23 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import type { RuntimeType } from './IInference';
+import type { IWorker } from '../../IWorker';
+import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
+import type { Disposable } from '@podman-desktop/api';
+import type { InferenceType, RuntimeType } from '@shared/src/models/IInference';
 
-export interface StartRecipeConfig {
-  runtime: RuntimeType,
-  recipeId: string,
-  modelId: string,
-}
+export abstract class InferenceProvider<T> implements IWorker<InferenceServerConfig, T>, Disposable {
+  readonly runtime: RuntimeType;
+  readonly type: InferenceType;
+  readonly name: string;
 
-export interface RecipeImage {
-  id: string;
-  engineId: string;
-  name?: string;
-  // recipe related
-  recipeId: string;
-  modelService: boolean;
-  ports: string[];
-  appName: string;
-}
+  protected constructor(runtime: RuntimeType, type: InferenceType, name: string) {
+    this.runtime = runtime;
+    this.type = type;
+    this.name = name;
+  }
 
-export interface Recipe {
-  id: string;
-  name: string;
-  categories: string[];
-  description: string;
-  icon?: string;
-  repository: string;
-  ref?: string;
-  readme: string;
-  basedir?: string;
-  recommended?: string[];
-  /**
-   * The backend field aims to target which inference
-   * server the recipe requires
-   */
-  backend?: string;
+  abstract enabled(): boolean;
+  abstract perform(config: InferenceServerConfig): Promise<T>;
+  abstract dispose(): void;
 }

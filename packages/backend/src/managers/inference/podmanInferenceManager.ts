@@ -15,7 +15,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import { InferenceServerStatus, InferenceType, RuntimeType } from '@shared/src/models/IInference';
+import type { InferenceServerStatus, InferenceType} from '@shared/src/models/IInference';
+import { RuntimeType } from '@shared/src/models/IInference';
 import type { PodmanConnection } from '../podmanConnection';
 import podmanDesktopApi, {
   containerEngine,
@@ -30,7 +31,7 @@ import type { ModelsManager } from '../modelsManager';
 import type { TaskRegistry } from '../../registries/TaskRegistry';
 import { basename, dirname } from 'node:path';
 import type { InferenceProviderRegistry } from '../../registries/InferenceProviderRegistry';
-import type { PodmanInferenceProvider } from '../../workers/provider/PodmanInferenceProvider';
+import type { PodmanInferenceProvider } from '../../workers/provider/inference/PodmanInferenceProvider';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
 import type { CatalogManager } from '../catalogManager';
 import { type InferenceServerInstance, RuntimeEngine } from './RuntimeEngine';
