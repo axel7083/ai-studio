@@ -53,6 +53,9 @@ export function getCustomBinaryPath(): string | undefined {
   return configuration.getConfiguration('podman').get('binary.path');
 }
 
+/**
+ * @deprecated uses {@link PodmanConnection.getContainerProviderConnectionInfo}
+ */
 export function getFirstRunningMachineName(): string | undefined {
   // the name of the podman connection is the name of the podman machine updated to make it more user friendly,
   // so to retrieve the real machine name we need to revert the process
@@ -80,6 +83,9 @@ export function getFirstRunningMachineName(): string | undefined {
   return undefined;
 }
 
+/**
+ * @deprecated uses {@link PodmanConnection.getContainerProviderConnectionInfo}
+ */
 export function getFirstRunningPodmanConnection(): ProviderContainerConnection | undefined {
   let engine: ProviderContainerConnection | undefined = undefined;
   try {
@@ -93,6 +99,9 @@ export function getFirstRunningPodmanConnection(): ProviderContainerConnection |
   return engine;
 }
 
+/**
+ * @deprecated uses {@link PodmanConnection.getContainerProviderConnectionInfo}
+ */
 export function getPodmanConnection(connectionName: string): ProviderContainerConnection {
   const engine = provider
     .getContainerConnections()
