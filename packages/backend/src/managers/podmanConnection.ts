@@ -35,7 +35,8 @@ export interface PodmanConnectionEvent {
 }
 
 export class PodmanConnection extends Publisher<ContainerProviderConnectionInfo[]> implements Disposable {
-  #providers: Map<string, ContainerProviderConnection>;
+  // Map of providerId with corresponding connections
+  #providers: Map<string, ContainerProviderConnection[]>;
   #disposables: Disposable[];
 
   private readonly _onPodmanConnectionEvent = new EventEmitter<PodmanConnectionEvent>();
@@ -49,18 +50,23 @@ export class PodmanConnection extends Publisher<ContainerProviderConnectionInfo[
   }
 
   /**
-   * Return a serializable object corresponding to the ContainerProviderConnection at the moment
-   * where the method is called.
+   * This method flatten the
    */
   getContainerProviderConnectionInfo(): ContainerProviderConnectionInfo[] {
-    return Array.from(this.#providers.values()).map(connection => ({
-      name: connection.name,
-      vmType: this.parseVMType(connection.vmType),
-      type: 'podman',
-      status: connection.status(),
-    }));
-  }
+    const output: ContainerProviderConnectionInfo[] = [];
 
+    for (const [providerId, connections] of Array.from(this.#providers.entries())) {
+      output.push(...connections.map((connection): ContainerProviderConnectionInfo => ({
+        providerId: providerId,
+        name: connection.name,
+        vmType: this.parseVMType(connection.vmType),
+        type: 'podman',
+        status: connection.status(),
+      })));
+    }
+
+    return output;
+  }
 
   init(): void {
     // setup listeners
@@ -77,10 +83,16 @@ export class PodmanConnection extends Publisher<ContainerProviderConnectionInfo[
     // clear all providers
     this.#providers.clear();
 
+    const providers = provider.getContainerConnections();
+
     // register the podman container connection
-    provider.getContainerConnections().filter(({ connection }) => connection.type === 'podman').forEach(connection => {
-      this.#providers.set(connection.connection.name, connection.connection);
-    });
+    providers
+      .filter(({ connection }) => connection.type === 'podman')
+      .forEach(({ providerId, connection}) => {
+        this.#providers.set(providerId, [
+          connection, ...(this.#providers.get(providerId) ?? []),
+        ]);
+      });
 
     // notify
     this.notify();
@@ -89,21 +101,21 @@ export class PodmanConnection extends Publisher<ContainerProviderConnectionInfo[
   private listen() {
     // capture unregister event
     this.#disposables.push(provider.onDidUnregisterContainerConnection(() => {
-      console.log('[PodmanConnection] onDidUnregisterContainerConnection');
       this.refreshProviders();
       this._onPodmanConnectionEvent.fire({
         status: 'unregister',
       });
     }));
 
-    this.#disposables.push(provider.onDidRegisterContainerConnection((e: RegisterContainerConnectionEvent) => {
-      console.log('[PodmanConnection] onDidRegisterContainerConnection');
-      if (e.connection.type !== 'podman') {
+    this.#disposables.push(provider.onDidRegisterContainerConnection(({ providerId, connection }: RegisterContainerConnectionEvent) => {
+      if (connection.type !== 'podman') {
         return;
       }
 
       // update connection
-      this.#providers.set(e.connection.name, e.connection);
+      this.#providers.set(providerId, [
+        connection, ...(this.#providers.get(providerId) ?? []),
+      ]);
       this.notify();
       this._onPodmanConnectionEvent.fire({
         status: 'register',
@@ -111,7 +123,6 @@ export class PodmanConnection extends Publisher<ContainerProviderConnectionInfo[
     }));
 
     this.#disposables.push(provider.onDidUpdateContainerConnection((e: UpdateContainerConnectionEvent) => {
-      console.log('[PodmanConnection] onDidUpdateContainerConnection');
       switch (e.status) {
         case 'started':
         case 'stopped':
@@ -126,7 +137,6 @@ export class PodmanConnection extends Publisher<ContainerProviderConnectionInfo[
     }));
 
     this.#disposables.push(provider.onDidUpdateProvider(() => {
-      console.log('[PodmanConnection] onDidUpdateProvider');
       this.refreshProviders();
     }));
   }

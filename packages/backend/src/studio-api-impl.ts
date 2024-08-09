@@ -44,10 +44,11 @@ import type { ModelOptions } from '@shared/src/models/IModelOptions';
 import type { CancellationTokenRegistry } from './registries/CancellationTokenRegistry';
 import type { LocalModelImportInfo } from '@shared/src/models/ILocalModelInfo';
 import { checkContainerConnectionStatusAndResources, getPodmanConnection } from './utils/podman';
-import type { ContainerConnectionInfo } from '@shared/src/models/IContainerConnectionInfo';
+import type { ContainerConnectionInfo, ContainerProviderConnectionInfo } from '@shared/src/models/IContainerConnectionInfo';
 import type { ExtensionConfiguration } from '@shared/src/models/IExtensionConfiguration';
 import type { ConfigurationRegistry } from './registries/ConfigurationRegistry';
 import type { RecipeManager } from './managers/recipes/RecipeManager';
+import { PodmanConnection } from './managers/podmanConnection';
 
 interface PortQuickPickItem extends podmanDesktopApi.QuickPickItem {
   port: number;
@@ -67,7 +68,13 @@ export class StudioApiImpl implements StudioAPI {
     private cancellationTokenRegistry: CancellationTokenRegistry,
     private configurationRegistry: ConfigurationRegistry,
     private recipeManager: RecipeManager,
-  ) {}
+    private podmanConnection: PodmanConnection,
+  ) {
+  }
+
+  async getContainerProviderConnectionInfo(): Promise<ContainerProviderConnectionInfo[]> {
+    return this.podmanConnection.getContainerProviderConnectionInfo();
+  }
 
   async requestDeleteConversation(conversationId: string): Promise<void> {
     // Do not wait on the promise as the api would probably timeout before the user answer.

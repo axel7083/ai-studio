@@ -262,7 +262,7 @@ export class Studio {
     this.#inferenceProviderRegistry = new InferenceProviderRegistry(this.#panel.webview);
     this.#extensionContext.subscriptions.push(
       this.#inferenceProviderRegistry.register(
-        new LlamaCppPython(this.#taskRegistry, this.#podmanConnection, this.#gpuManager, this.#configurationRegistry),
+        new LlamaCppPython(this.#taskRegistry, this.#gpuManager, this.#configurationRegistry),
       ),
     );
 
@@ -317,6 +317,7 @@ export class Studio {
       this.#cancellationTokenRegistry,
       this.#configurationRegistry,
       this.#recipeManager,
+      this.#podmanConnection,
     );
     // Register the instance
     this.#rpcExtension.registerInstance<StudioApiImpl>(StudioApiImpl, this.#studioApi);

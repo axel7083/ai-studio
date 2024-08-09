@@ -18,8 +18,9 @@
 import type { VMType } from './IPodman';
 
 export interface ContainerProviderConnectionInfo {
+  providerId: string;
   name: string;
-  type: 'podman', // only support podman
+  type: 'podman', // we only support podman
   status: 'started' | 'stopped' | 'starting' | 'stopping' | 'unknown',
   vmType: VMType,
 }

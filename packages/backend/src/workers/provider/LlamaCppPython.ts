@@ -26,7 +26,6 @@ import { type InferenceServer, InferenceType } from '@shared/src/models/IInferen
 import type { GPUManager } from '../../managers/GPUManager';
 import { GPUVendor, type IGPUInfo } from '@shared/src/models/IGPUInfo';
 import { VMType } from '@shared/src/models/IPodman';
-import type { PodmanConnection } from '../../managers/podmanConnection';
 import type { ConfigurationRegistry } from '../../registries/ConfigurationRegistry';
 
 export const LLAMA_CPP_CPU = 'ghcr.io/containers/llamacpp_python:latest';
@@ -45,7 +44,6 @@ interface Device {
 export class LlamaCppPython extends InferenceProvider {
   constructor(
     taskRegistry: TaskRegistry,
-    private podmanConnection: PodmanConnection,
     private gpuManager: GPUManager,
     private configurationRegistry: ConfigurationRegistry,
   ) {
@@ -199,12 +197,10 @@ export class LlamaCppPython extends InferenceProvider {
       gpu = gpus[0];
     }
 
-    const vmType = await this.podmanConnection.getVMType();
-
     // pull the image
     const imageInfo: ImageInfo = await this.pullImage(
-      config.providerId,
-      config.image ?? this.getLlamaCppInferenceImage(vmType, gpu),
+      config.containerProviderConnection,
+      config.image ?? this.getLlamaCppInferenceImage(config.containerProviderConnection.vmType, gpu),
       config.labels,
     );
 
@@ -212,7 +208,7 @@ export class LlamaCppPython extends InferenceProvider {
     const containerCreateOptions: ContainerCreateOptions = await this.getContainerCreateOptions(
       config,
       imageInfo,
-      vmType,
+      config.containerProviderConnection.vmType,
       gpu,
     );
 

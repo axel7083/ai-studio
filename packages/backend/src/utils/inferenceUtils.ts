@@ -28,13 +28,14 @@ import type { CreationInferenceServerOptions, InferenceServerConfig } from '@sha
 import { getFreeRandomPort } from './ports';
 import { type InferenceServer, InferenceType } from '@shared/src/models/IInference';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
+import type { ContainerProviderConnectionInfo } from '@shared/src/models/IContainerConnectionInfo';
 
 export const LABEL_INFERENCE_SERVER: string = 'ai-lab-inference-server';
 
 /**
  * Return container connection provider
  */
-export function getProviderContainerConnection(providerId?: string): ProviderContainerConnection {
+export function getProviderContainerConnection(containerProviderConnection?: ContainerProviderConnectionInfo): ProviderContainerConnection {
   // Get started providers
   const providers = provider
     .getContainerConnections()
@@ -45,8 +46,8 @@ export function getProviderContainerConnection(providerId?: string): ProviderCon
   let output: ProviderContainerConnection | undefined = undefined;
 
   // If we expect a specific engine
-  if (providerId !== undefined) {
-    output = providers.find(engine => engine.providerId === providerId);
+  if (containerProviderConnection !== undefined) {
+    output = providers.find(engine => engine.providerId === containerProviderConnection.providerId && engine.connection.name === containerProviderConnection.name);
   } else {
     // Have a preference for a podman engine
     output = providers.find(engine => engine.connection.type === 'podman');
@@ -107,7 +108,7 @@ export async function withDefaultConfiguration(
     image: options.image,
     labels: options.labels || {},
     modelsInfo: options.modelsInfo,
-    providerId: options.providerId,
+    containerProviderConnection: options.containerProviderConnection,
     inferenceProvider: options.inferenceProvider,
     gpuLayers: options.gpuLayers !== undefined ? options.gpuLayers : -1,
   };

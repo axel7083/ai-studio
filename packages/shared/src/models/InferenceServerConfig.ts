@@ -16,8 +16,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 import type { ModelInfo } from './IModelInfo';
+import type { ContainerProviderConnectionInfo } from './IContainerConnectionInfo';
 
-export type CreationInferenceServerOptions = Partial<InferenceServerConfig> & { modelsInfo: ModelInfo[] };
+export type CreationInferenceServerOptions = Partial<InferenceServerConfig> & { modelsInfo: ModelInfo[], containerProviderConnection: ContainerProviderConnectionInfo };
 
 export interface InferenceServerConfig {
   /**
@@ -27,7 +28,7 @@ export interface InferenceServerConfig {
   /**
    * The identifier of the container provider to use
    */
-  providerId?: string;
+  containerProviderConnection: ContainerProviderConnectionInfo;
   /**
    * The name of the inference provider to use
    */

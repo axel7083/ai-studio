@@ -29,7 +29,7 @@ import type { CreationInferenceServerOptions } from './models/InferenceServerCon
 import type { ModelOptions } from './models/IModelOptions';
 import type { Conversation } from './models/IPlaygroundMessage';
 import type { LocalModelImportInfo } from './models/ILocalModelInfo';
-import type { ContainerConnectionInfo } from './models/IContainerConnectionInfo';
+import type { ContainerConnectionInfo, ContainerProviderConnectionInfo } from './models/IContainerConnectionInfo';
 import type { ExtensionConfiguration } from './models/IExtensionConfiguration';
 
 export abstract class StudioAPI {
@@ -61,6 +61,8 @@ export abstract class StudioAPI {
   abstract openURL(url: string): Promise<boolean>;
   abstract openFile(file: string, recipeId?: string): Promise<boolean>;
   abstract openDialog(options?: OpenDialogOptions): Promise<Uri[] | undefined>;
+
+  abstract getContainerProviderConnectionInfo(): Promise<ContainerProviderConnectionInfo[]>;
 
   /**
    * Get the information of models saved locally into the user's directory

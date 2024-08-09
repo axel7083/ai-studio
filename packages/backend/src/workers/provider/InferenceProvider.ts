@@ -28,6 +28,7 @@ import type { IWorker } from '../IWorker';
 import type { TaskRegistry } from '../../registries/TaskRegistry';
 import { getImageInfo, getProviderContainerConnection } from '../../utils/inferenceUtils';
 import type { InferenceServer, InferenceType } from '@shared/src/models/IInference';
+import type { ContainerProviderConnectionInfo } from '@shared/src/models/IContainerConnectionInfo';
 
 export type BetterContainerCreateResult = ContainerCreateResult & { engineId: string };
 
@@ -77,13 +78,13 @@ export abstract class InferenceProvider implements IWorker<InferenceServerConfig
 
   /**
    * This method allows to pull the image, while creating a task for the user to follow progress
-   * @param providerId
+   * @param containerProviderConnection
    * @param image
    * @param labels
    * @protected
    */
   protected pullImage(
-    providerId: string | undefined,
+    containerProviderConnection: ContainerProviderConnectionInfo | undefined,
     image: string,
     labels: { [id: string]: string },
   ): Promise<ImageInfo> {
@@ -91,7 +92,7 @@ export abstract class InferenceProvider implements IWorker<InferenceServerConfig
     const pullingTask = this.taskRegistry.createTask(`Pulling ${image}.`, 'loading', labels);
 
     // Get the provider
-    const provider = getProviderContainerConnection(providerId);
+    const provider = getProviderContainerConnection(containerProviderConnection);
 
     // get the default image info for this provider
     return getImageInfo(provider.connection, image, (_event: PullEvent) => {})

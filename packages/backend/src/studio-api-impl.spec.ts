@@ -40,6 +40,7 @@ import type { LocalModelImportInfo } from '@shared/src/models/ILocalModelInfo';
 import * as podman from './utils/podman';
 import type { ConfigurationRegistry } from './registries/ConfigurationRegistry';
 import type { RecipeManager } from './managers/recipes/RecipeManager';
+import type { PodmanConnection } from './managers/podmanConnection';
 
 vi.mock('./ai.json', () => {
   return {
@@ -147,6 +148,7 @@ beforeEach(async () => {
     {} as unknown as CancellationTokenRegistry,
     {} as unknown as ConfigurationRegistry,
     {} as unknown as RecipeManager,
+    {} as unknown as PodmanConnection,
   );
   vi.mock('node:fs');
 
