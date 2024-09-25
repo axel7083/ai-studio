@@ -19,7 +19,14 @@
 import type { LocalModelInfo } from '@shared/src/models/ILocalModelInfo';
 import fs from 'node:fs';
 import * as path from 'node:path';
-import { type Webview, fs as apiFs, type Disposable, env, type ContainerProviderConnection } from '@podman-desktop/api';
+import {
+  type Webview,
+  fs as apiFs,
+  type Disposable,
+  env,
+  type ContainerProviderConnection,
+  type Progress,
+} from '@podman-desktop/api';
 import { Messages } from '@shared/Messages';
 import type { CatalogManager } from './catalogManager';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
@@ -27,7 +34,7 @@ import * as podmanDesktopApi from '@podman-desktop/api';
 import { Downloader } from '../utils/downloader';
 import type { TaskRegistry } from '../registries/TaskRegistry';
 import type { Task } from '@shared/src/models/ITask';
-import type { BaseEvent } from '../models/baseEvent';
+import type { BaseEvent, ProgressEvent } from '../models/baseEvent';
 import { isCompletionEvent, isProgressEvent } from '../models/baseEvent';
 import { Uploader } from '../utils/uploader';
 import { deleteRemoteModel, getLocalModelFile, isModelUploaded } from '../utils/modelsUtils';
@@ -418,8 +425,46 @@ export class ModelsManager implements Disposable {
     downloader.onEvent(event => this.onDownloadUploadEvent(event, 'download'), this);
 
     // perform download
-    await downloader.perform(model.id);
+    await podmanDesktopApi.window.withProgress(
+      {
+        location: podmanDesktopApi.ProgressLocation.TASK_WIDGET,
+        title: `Downloading ${model.name}`,
+        cancellable: false,
+      },
+      (progress, token) => {
+        token.onCancellationRequested(() => {
+          abortController.abort('Cancel');
+        });
+        this.propagateDownloaderEvent(downloader, progress);
+        return downloader.perform(model.id);
+      },
+    );
+
     return downloader.getTarget();
+  }
+
+  protected propagateDownloaderEvent(
+    downloader: Downloader,
+    progress: Progress<{ message?: string; increment?: number }>,
+  ): void {
+    downloader.onEvent(event => {
+      switch (event.status) {
+        case 'error':
+          progress.report({ message: `Error: ${event.message}` });
+          break;
+        case 'completed':
+          progress.report({ message: `Completed`, increment: -1 });
+          break;
+        case 'progress':
+          progress.report({
+            increment: Math.round((event as ProgressEvent).value),
+          });
+          break;
+        case 'canceled':
+          progress.report({ message: `Cancelled: ${event.message}` });
+          break;
+      }
+    });
   }
 
   async uploadModelToPodmanMachine(

@@ -21,7 +21,7 @@ import os from 'node:os';
 import fs, { type Stats, type PathLike } from 'node:fs';
 import path from 'node:path';
 import { ModelsManager } from './modelsManager';
-import { env, process as coreProcess } from '@podman-desktop/api';
+import { env, process as coreProcess, window } from '@podman-desktop/api';
 import type { RunResult, TelemetryLogger, Webview, ContainerProviderConnection } from '@podman-desktop/api';
 import type { CatalogManager } from './catalogManager';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
@@ -83,7 +83,11 @@ vi.mock('@podman-desktop/api', () => {
       }),
     },
     window: {
+      withProgress: vi.fn(),
       showErrorMessage: mocks.showErrorMessageMock,
+    },
+    ProgressLocation: {
+      TASK_WIDGET: 2,
     },
   };
 });
@@ -132,6 +136,18 @@ beforeEach(() => {
   });
 
   mocks.isCompletionEventMock.mockReturnValue(true);
+
+  vi.mocked(window.withProgress).mockImplementation(async (_, task) => {
+    return task(
+      {
+        report: vi.fn(),
+      },
+      {
+        onCancellationRequested: vi.fn(),
+        isCancellationRequested: false,
+      },
+    );
+  });
 });
 
 const dirent = [
@@ -806,7 +822,7 @@ describe('downloadModel', () => {
 
     // Only called once
     expect(mocks.performDownloadMock).toHaveBeenCalledTimes(1);
-    expect(mocks.onEventDownloadMock).toHaveBeenCalledTimes(1);
+    expect(mocks.onEventDownloadMock).toHaveBeenCalledTimes(2);
   });
 
   test('multiple download request same model - second call before first completed', async () => {
@@ -857,7 +873,7 @@ describe('downloadModel', () => {
 
     // Only called once
     expect(mocks.performDownloadMock).toHaveBeenCalledTimes(1);
-    expect(mocks.onEventDownloadMock).toHaveBeenCalledTimes(2);
+    expect(mocks.onEventDownloadMock).toHaveBeenCalledTimes(3);
   });
 });
 
