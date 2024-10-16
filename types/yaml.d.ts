@@ -16,15 +16,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { InstructlabSession, InstructLabSessionConfig } from './models/instructlab/IInstructlabSession';
-
-export abstract class InstructlabAPI {
-  static readonly CHANNEL: string = 'InstructlabAPI';
-  /**
-   * Get sessions of InstructLab tuning
-   */
-  abstract getIsntructlabSessions(): Promise<InstructlabSession[]>;
-
-  abstract requestNewSession(config: InstructLabSessionConfig): Promise<string>;
-  abstract requestGenerateSession(uid: string): Promise<void>;
+declare module '*.yaml?raw' {
+  const contents: string;
+  export = contents;
 }

@@ -312,6 +312,12 @@ export class PodmanConnection extends Publisher<ContainerProviderConnectionInfo[
     throw new Error('connection not found');
   }
 
+  async getEngineId(connection: ContainerProviderConnection): Promise<string> {
+    const infos = await containerEngine.listInfos({ provider: connection });
+    if (infos.length !== 1) throw new Error(`cannot find engine infos for connection ${connection.name}`);
+    return infos[0].engineId;
+  }
+
   async checkContainerConnectionStatusAndResources(
     options: CheckContainerConnectionResourcesOptions,
   ): Promise<ContainerConnectionInfo> {

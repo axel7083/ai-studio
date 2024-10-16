@@ -3,7 +3,7 @@ import { faGaugeHigh, faPlusCircle } from '@fortawesome/free-solid-svg-icons';
 import { Button, EmptyScreen, NavPage, Tab, Table, TableColumn, TableRow } from '@podman-desktop/ui-svelte';
 import { onMount } from 'svelte';
 import { instructlabSessions } from '../stores/instructlabSessions';
-import type { InstructlabSession } from '@shared/src/models/instructlab/IInstructlabSession';
+import { type InstructlabSession, InstructLabState } from '@shared/src/models/instructlab/IInstructlabSession';
 import InstructlabColumnName from '../lib/table/instructlab/InstructlabColumnName.svelte';
 import InstructlabColumnModelName from '../lib/table/instructlab/InstructlabColumnModelName.svelte';
 import InstructlabColumnRepository from '../lib/table/instructlab/InstructlabColumnRepository.svelte';
@@ -14,7 +14,7 @@ import { router } from 'tinro';
 import Route from '../Route.svelte';
 
 function start(): void {
-  router.goto('/tune/start');
+router.goto('/tune/start');
 }
 
 const columns: TableColumn<InstructlabSession>[] = [
@@ -35,10 +35,10 @@ const columns: TableColumn<InstructlabSession>[] = [
 ];
 const row = new TableRow<InstructlabSession>({});
 
-let data: InstructlabSession[];
+let data: InstructlabSession[] = $state([]);
 
-$: running = data?.filter(t => t.status !== 'fine-tuned');
-$: completed = data?.filter(t => t.status === 'fine-tuned');
+let running = $derived(data.filter(t => t.state !== InstructLabState.COMPLETED));
+let completed = $derived(data.filter(t => t.state === InstructLabState.COMPLETED));
 
 onMount(() => {
   return instructlabSessions.subscribe(items => {

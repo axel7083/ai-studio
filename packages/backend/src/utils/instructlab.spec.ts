@@ -15,16 +15,24 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
+import { describe, expect, test, vi } from 'vitest';
+import { isNameValid } from './instructlab';
 
-import type { InstructlabSession, InstructLabSessionConfig } from './models/instructlab/IInstructlabSession';
+describe('isNameValid', () => {
+  test.each([
+    'hello-world',
+    'hello',
+    'helloworld',
+  ])('%s should be valid', (value: string) => {
+    expect(isNameValid(value)).toBeTruthy();
+  });
 
-export abstract class InstructlabAPI {
-  static readonly CHANNEL: string = 'InstructlabAPI';
-  /**
-   * Get sessions of InstructLab tuning
-   */
-  abstract getIsntructlabSessions(): Promise<InstructlabSession[]>;
-
-  abstract requestNewSession(config: InstructLabSessionConfig): Promise<string>;
-  abstract requestGenerateSession(uid: string): Promise<void>;
-}
+  test.each([
+    'hello/world',
+    'hello world',
+    'hello_world',
+    'helloWorld',
+  ])('%s should not be valid', (value: string) => {
+    expect(isNameValid(value)).toBeFalsy();
+  });
+});

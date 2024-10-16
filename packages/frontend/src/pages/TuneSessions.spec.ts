@@ -16,11 +16,15 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import { vi, test, expect } from 'vitest';
-import { screen, render, waitFor, within } from '@testing-library/svelte';
+import { expect, test, vi } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/svelte';
 import { router } from 'tinro';
 import TuneSessions from './TuneSessions.svelte';
-import type { InstructlabSession } from '@shared/src/models/instructlab/IInstructlabSession';
+import {
+  type InstructlabSession,
+  InstructLabState,
+  TRAINING,
+} from '@shared/src/models/instructlab/IInstructlabSession';
 import type { ApplicationCatalog } from '@shared/src/models/IApplicationCatalog';
 
 const mocks = vi.hoisted(() => ({
@@ -65,20 +69,30 @@ test('should display sessions', async () => {
   const time = new Date(new Date().getTime() - 6 * 24 * 60 * 60 * 1000).getTime() / 1000; // 6 days ago
   const sessions: InstructlabSession[] = [
     {
+      uid: 'session-1-uid',
       name: 'session 1',
-      modelId: 'model1',
-      targetModel: 'model1-target',
+      instructModelId: 'model1',
+      targetModelId: 'model1-target',
       repository: '/repo1',
-      status: 'fine-tuned',
+      state: InstructLabState.GENERATING,
+      status: 'initializing',
       createdTime: time,
+      labels: {},
+      baseImage: '',
+      training: TRAINING.SKILLS,
     },
     {
+      uid: 'session-2-uid',
       name: 'session 2',
-      modelId: 'model2',
-      targetModel: 'model2-target',
+      instructModelId: 'model2',
+      targetModelId: 'model2-target',
       repository: '/repo2',
-      status: 'generating-instructions',
+      state: InstructLabState.GENERATING,
+      status: 'initializing',
       createdTime: time,
+      labels: {},
+      baseImage: '',
+      training: TRAINING.SKILLS,
     },
   ];
   mocks.instructlabSessionsListMock.mockReturnValue(sessions);

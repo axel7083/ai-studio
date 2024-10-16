@@ -15,19 +15,73 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
+import type { ContainerProviderConnectionInfo } from '../IContainerConnectionInfo';
 
-export type InstructlabSessionStatus = 'fine-tuned' | 'generating-instructions';
+export enum InstructLabState {
+  INITIALIZED = 'initialized',
+  GENERATING = 'generating',
+  FINE_TUNING = 'fine-tuning',
+  COMPLETED = 'completed',
+}
+
+export enum TRAINING {
+  SKILLS = 'skills',
+  KNOWLEDGE = 'knowledge',
+}
 
 export interface InstructlabSession {
+  // unique identifier
+  uid: string;
+
+  // connection to use
+  connection?: ContainerProviderConnectionInfo;
+
+  // container image to use
+  baseImage: string;
+
+  // session name
   name: string;
 
-  modelId: string;
+  // models
+  instructModelId: string;
+  targetModelId: string;
 
-  targetModel: string;
-
+  // taxonomy
   repository: string;
 
+  // timestamp
   createdTime: number;
 
-  status: InstructlabSessionStatus;
+  training: TRAINING,
+
+  state: InstructLabState;
+  /**
+   * Labels to propagate
+   */
+  labels: { [id: string]: string };
+}
+
+export interface InstructLabSessionConfig {
+  /**
+   * The connection info to use
+   */
+  connection?: ContainerProviderConnectionInfo;
+
+  repository?: string;
+
+  name: string;
+  training: TRAINING,
+  files: string[];
+  /**
+   * Model that will be used to generate the synthetic data
+   */
+  instructModelId: string;
+  /**
+   * Model that will be fine-tuned
+   */
+  targetModelId: string;
+  /**
+   * Labels to propagate
+   */
+  labels: { [id: string]: string };
 }

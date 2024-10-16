@@ -277,7 +277,16 @@ export class Studio {
     this.#extensionContext.subscriptions.push(this.#inferenceManager);
 
     /** The InstructLab tunning sessions manager */
-    this.#instructlabManager = new InstructlabManager();
+    this.#instructlabManager = new InstructlabManager(
+      this.#panel.webview,
+      appUserDirectory,
+      this.#modelsManager,
+      this.#podmanConnection,
+      this.#inferenceManager,
+      gitManager,
+      this.#taskRegistry,
+    );
+    this.#extensionContext.subscriptions.push(this.#instructlabManager);
 
     /**
      * The recipe manage offer some andy methods to manage recipes, build get images etc.

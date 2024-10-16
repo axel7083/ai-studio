@@ -18,12 +18,20 @@
 
 import type { InstructlabAPI } from '@shared/src/InstructlabAPI';
 import type { InstructlabManager } from './managers/instructlab/instructlabManager';
-import type { InstructlabSession } from '@shared/src/models/instructlab/IInstructlabSession';
+import type { InstructlabSession, InstructLabSessionConfig } from '@shared/src/models/instructlab/IInstructlabSession';
 
 export class InstructlabApiImpl implements InstructlabAPI {
   constructor(private instructlabManager: InstructlabManager) {}
 
   async getIsntructlabSessions(): Promise<InstructlabSession[]> {
     return this.instructlabManager.getSessions();
+  }
+
+  async requestNewSession(config: InstructLabSessionConfig): Promise<string> {
+    return this.instructlabManager.requestNewSession(config);
+  }
+
+  async requestGenerateSession(uid: string): Promise<void> {
+    return this.instructlabManager.requestGenerate(uid);
   }
 }
