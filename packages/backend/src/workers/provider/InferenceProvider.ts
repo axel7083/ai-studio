@@ -16,31 +16,24 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 import type {
-  ContainerCreateOptions,
-  ContainerCreateResult,
-  ContainerProviderConnection,
   Disposable,
-  ImageInfo,
-  PullEvent,
 } from '@podman-desktop/api';
-import { containerEngine } from '@podman-desktop/api';
 import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import type { IWorker } from '../IWorker';
 import type { TaskRegistry } from '../../registries/TaskRegistry';
-import { getImageInfo } from '../../utils/inferenceUtils';
 import type { InferenceServer, InferenceType } from '@shared/src/models/IInference';
+import { ContainerProvider } from './ContainerProvider';
 
-export type BetterContainerCreateResult = ContainerCreateResult & { engineId: string };
-
-export abstract class InferenceProvider implements IWorker<InferenceServerConfig, InferenceServer>, Disposable {
+export abstract class InferenceProvider extends ContainerProvider implements IWorker<InferenceServerConfig, InferenceServer>, Disposable {
   readonly type: InferenceType;
   readonly name: string;
 
   protected constructor(
-    private taskRegistry: TaskRegistry,
+    taskRegistry: TaskRegistry,
     type: InferenceType,
     name: string,
   ) {
+    super(taskRegistry);
     this.type = type;
     this.name = name;
   }
@@ -48,64 +41,4 @@ export abstract class InferenceProvider implements IWorker<InferenceServerConfig
   abstract enabled(): boolean;
   abstract perform(config: InferenceServerConfig): Promise<InferenceServer>;
   abstract dispose(): void;
-
-  protected async createContainer(
-    engineId: string,
-    containerCreateOptions: ContainerCreateOptions,
-    labels: { [id: string]: string },
-  ): Promise<BetterContainerCreateResult> {
-    const containerTask = this.taskRegistry.createTask(`Creating container.`, 'loading', labels);
-
-    try {
-      const result = await containerEngine.createContainer(engineId, containerCreateOptions);
-      // update the task
-      containerTask.state = 'success';
-      containerTask.progress = undefined;
-      // return the ContainerCreateResult
-      return {
-        id: result.id,
-        engineId: engineId,
-      };
-    } catch (err: unknown) {
-      containerTask.state = 'error';
-      containerTask.progress = undefined;
-      containerTask.error = `Something went wrong while creating container: ${String(err)}`;
-      throw err;
-    } finally {
-      this.taskRegistry.updateTask(containerTask);
-    }
-  }
-
-  /**
-   * This method allows to pull the image, while creating a task for the user to follow progress
-   * @param connection
-   * @param image
-   * @param labels
-   * @protected
-   */
-  protected pullImage(
-    connection: ContainerProviderConnection,
-    image: string,
-    labels: { [id: string]: string },
-  ): Promise<ImageInfo> {
-    // Creating a task to follow pulling progress
-    const pullingTask = this.taskRegistry.createTask(`Pulling ${image}.`, 'loading', labels);
-
-    // get the default image info for this provider
-    return getImageInfo(connection, image, (_event: PullEvent) => {})
-      .catch((err: unknown) => {
-        pullingTask.state = 'error';
-        pullingTask.progress = undefined;
-        pullingTask.error = `Something went wrong while pulling ${image}: ${String(err)}`;
-        throw err;
-      })
-      .then(imageInfo => {
-        pullingTask.state = 'success';
-        pullingTask.progress = undefined;
-        return imageInfo;
-      })
-      .finally(() => {
-        this.taskRegistry.updateTask(pullingTask);
-      });
-  }
 }

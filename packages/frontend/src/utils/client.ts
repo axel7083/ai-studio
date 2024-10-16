@@ -51,3 +51,7 @@ export async function getRouterState(): Promise<RouterState> {
 Object.defineProperty(window, 'studioClient', {
   value: studioClient,
 });
+
+Object.defineProperty(window, 'instructlabClient', {
+  value: instructlabClient,
+});

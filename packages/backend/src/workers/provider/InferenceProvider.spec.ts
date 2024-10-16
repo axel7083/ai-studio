@@ -18,7 +18,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { TaskRegistry } from '../../registries/TaskRegistry';
-import { type BetterContainerCreateResult, InferenceProvider } from './InferenceProvider';
+import { InferenceProvider } from './InferenceProvider';
 import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import type { ContainerCreateOptions, ContainerProviderConnection, ImageInfo } from '@podman-desktop/api';
 import { containerEngine } from '@podman-desktop/api';
@@ -26,6 +26,7 @@ import { getImageInfo } from '../../utils/inferenceUtils';
 import type { TaskState } from '@shared/src/models/ITask';
 import type { InferenceServer } from '@shared/src/models/IInference';
 import { InferenceType } from '@shared/src/models/IInference';
+import { BetterContainerCreateResult } from './ContainerProvider';
 
 vi.mock('../../utils/inferenceUtils', () => ({
   getImageInfo: vi.fn(),

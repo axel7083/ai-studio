@@ -89,9 +89,11 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
 
   /**
    * Get the Inference servers
+   * if engineId is defined, only server with the matching engineId will be returned
    */
-  public getServers(): InferenceServer[] {
-    return Array.from(this.#servers.values());
+  public getServers(engineId?: string): InferenceServer[] {
+    const values = Array.from(this.#servers.values());
+    return engineId?values.filter(value => value.container.engineId === engineId):values;
   }
 
   /**
@@ -106,7 +108,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
    * return the first inference server which is using the specific model
    * it throws if the model backend is not currently supported
    */
-  public findServerByModel(model: ModelInfo): InferenceServer | undefined {
+  public findServerByModel(model: ModelInfo, engineId?: string): InferenceServer | undefined {
     // check if model backend is supported
     const backend: InferenceType = getInferenceType([model]);
     const providers: InferenceProvider[] = this.inferenceProviderRegistry
@@ -115,7 +117,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
     if (providers.length === 0) {
       throw new Error('no enabled provider could be found.');
     }
-    return this.getServers().find(s => s.models.some(m => m.id === model.id));
+    return this.getServers(engineId).find(s => s.models.some(m => m.id === model.id));
   }
 
   /**

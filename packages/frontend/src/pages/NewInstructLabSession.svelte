@@ -1,13 +1,30 @@
 <script lang="ts">
 import { router } from 'tinro';
-import { FormPage, Input, Button, Link } from '@podman-desktop/ui-svelte';
-import { faFile, faPlus, faPlusCircle, faMinusCircle, faCircleCheck } from '@fortawesome/free-solid-svg-icons';
+import { Button, FormPage, Input, Link } from '@podman-desktop/ui-svelte';
+import {
+  faCircleCheck,
+  faFile,
+  faMinusCircle,
+  faPlus,
+  faPlusCircle,
+  faUpRightFromSquare,
+} from '@fortawesome/free-solid-svg-icons';
 import Fa from 'svelte-fa';
 import ModelSelect from '/@/lib/select/ModelSelect.svelte';
 import { modelsInfo } from '/@/stores/modelsInfo';
-import { studioClient } from '/@/utils/client';
+import { instructlabClient, studioClient } from '/@/utils/client';
 import { Uri } from '@shared/src/uri/Uri';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
+import { TRAINING } from '@shared/src/models/instructlab/IInstructlabSession';
+import type { Task } from '@shared/src/models/ITask';
+import TrackedTasks from '/@/lib/progress/TrackedTasks.svelte';
+import { tasks } from '/@/stores/tasks';
+
+interface Props {
+  trackingId?: string;
+}
+
+let { trackingId }: Props = $props();
 
 let skillsFiles: string[] = $state([]);
 let knowledgeFiles: string[] = $state([]);
@@ -18,6 +35,10 @@ let sessionName: string = $state('');
 let model: ModelInfo | undefined = $state(undefined);
 
 let trainingType: 'knowledge' | 'skills' = $state('knowledge');
+
+let loading = $state(false);
+// All tasks are successful (not any in error)
+let completed: boolean = $state(false);
 
 $effect(() => {
   valid = (skillsFiles.length > 0 || knowledgeFiles.length > 0) && !!model && sessionName.length > 0;
@@ -83,6 +104,34 @@ function openInstructLabDocumentation(): void {
       console.error(err);
     });
 }
+
+const processTasks = (trackedTasks: Task[]): void => {
+  // if one task is in loading we are still loading
+  loading = !!trackingId && trackedTasks.some(task => task.state === 'loading');
+
+  // if all task are successful we are successful
+  completed = !!trackingId && trackedTasks.every(task => task.state === 'success');
+};
+
+async function submit(): Promise<void> {
+  if(!model || !sessionName) return;
+  // take snapshot
+  const mModel = $state.snapshot(model);
+
+  try {
+    const trackingId = await instructlabClient.requestNewSession({
+      files: $state.snapshot(trainingType) === 'skills' ? $state.snapshot(skillsFiles) : $state.snapshot(knowledgeFiles),
+      labels: {},
+      name: $state.snapshot(sessionName),
+      targetModelId: mModel.id,
+      instructModelId: mModel.id,
+      training: $state.snapshot(trainingType) === 'skills' ? TRAINING.SKILLS : TRAINING.KNOWLEDGE,
+    });
+    router.location.query.set('trackingId', trackingId);
+  } catch (err: unknown) {
+    console.error('something went wrong while trying to requestNewSession', err);
+  }
+}
 </script>
 
 <FormPage
@@ -99,6 +148,10 @@ function openInstructLabDocumentation(): void {
   </svelte:fragment>
   <svelte:fragment slot="content">
     <div class="flex flex-col w-full">
+
+      <!-- tasks tracked -->
+      <TrackedTasks onChange={processTasks} class="mx-5 mt-5" trackingId={trackingId} tasks={$tasks} />
+
       <!-- form -->
       <div class="bg-[var(--pd-content-card-bg)] m-5 space-y-6 px-8 sm:pb-6 xl:pb-8 rounded-lg h-fit">
         <div class="w-full flex flex-col gap-y-4">
@@ -244,9 +297,18 @@ function openInstructLabDocumentation(): void {
         </div>
         <footer>
           <div class="w-full flex flex-col">
-            <Button title="Start session" inProgress={false} disabled={!valid} icon={faPlusCircle}>
-              Start session
-            </Button>
+            {#if completed}
+              <Button icon={faUpRightFromSquare} title="List sessions" on:click={goToUpPage}>List sessions</Button>
+            {:else}
+              <Button
+                on:click={submit}
+                title="Start session"
+                inProgress={loading}
+                disabled={!valid}
+                icon={faPlusCircle}>
+                Start session
+              </Button>
+            {/if}
           </div>
         </footer>
       </div>

@@ -96,9 +96,9 @@ onDestroy(() => {
         </Route>
         {#if experimentalTuning}
           <!-- Tune with InstructLab -->
-          <Route path="/tune/*" firstmatch>
+          <Route path="/tune/*" firstmatch let:meta>
             <Route path="/start">
-              <NewInstructLabSession />
+              <NewInstructLabSession trackingId={meta.query.trackingId} />
             </Route>
             <Route path="/*">
               <TuneSessions />
