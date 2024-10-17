@@ -54,6 +54,7 @@ import { InstructlabApiImpl } from './instructlab-api-impl';
 import { NavigationRegistry } from './registries/NavigationRegistry';
 import { StudioAPI } from '@shared/src/StudioAPI';
 import { InstructlabAPI } from '@shared/src/InstructlabAPI';
+import { InstructLabRegistry } from './registries/instructlab/InstructLabRegistry';
 
 export class Studio {
   readonly #extensionContext: ExtensionContext;
@@ -90,6 +91,7 @@ export class Studio {
   #gpuManager: GPUManager | undefined;
   #navigationRegistry: NavigationRegistry | undefined;
   #instructlabManager: InstructlabManager | undefined;
+  #instructLabSessionRegistry: InstructLabRegistry | undefined;
 
   constructor(readonly extensionContext: ExtensionContext) {
     this.#extensionContext = extensionContext;
@@ -276,15 +278,22 @@ export class Studio {
     this.#inferenceManager.init();
     this.#extensionContext.subscriptions.push(this.#inferenceManager);
 
+    this.#instructLabSessionRegistry = new InstructLabRegistry(
+      this.#panel.webview,
+      appUserDirectory,
+    );
+    this.#instructLabSessionRegistry.init();
+    this.#extensionContext.subscriptions.push(this.#instructLabSessionRegistry);
+
     /** The InstructLab tunning sessions manager */
     this.#instructlabManager = new InstructlabManager(
-      this.#panel.webview,
       appUserDirectory,
       this.#modelsManager,
       this.#podmanConnection,
       this.#inferenceManager,
       gitManager,
       this.#taskRegistry,
+      this.#instructLabSessionRegistry,
     );
     this.#extensionContext.subscriptions.push(this.#instructlabManager);
 
@@ -368,7 +377,7 @@ export class Studio {
     await apiServer.init();
     this.#extensionContext.subscriptions.push(apiServer);
 
-    this.#instructlabApi = new InstructlabApiImpl(this.#instructlabManager);
+    this.#instructlabApi = new InstructlabApiImpl(this.#instructlabManager, this.#instructLabSessionRegistry);
     // Register the instance
     this.#rpcExtension.registerInstance<InstructlabAPI>(InstructlabAPI, this.#instructlabApi);
   }

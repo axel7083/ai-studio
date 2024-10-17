@@ -85,3 +85,8 @@ export interface InstructLabSessionConfig {
    */
   labels: { [id: string]: string };
 }
+
+export interface InstructLabSessions {
+  version: '1.0',
+  sessions: InstructlabSession[];
+}
