@@ -16,16 +16,15 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import {
+import type {
   InstructlabSession,
-  InstructLabSessionConfig,
+  InstructLabSessionConfig} from '@shared/src/models/instructlab/IInstructlabSession';
+import {
   InstructLabState,
   TRAINING,
 } from '@shared/src/models/instructlab/IInstructlabSession';
-import type { ContainerCreateResult, ContainerProviderConnection, Disposable, Webview } from '@podman-desktop/api';
+import type { ContainerCreateResult, ContainerProviderConnection, Disposable } from '@podman-desktop/api';
 import { containerEngine } from '@podman-desktop/api';
-import { Publisher } from '../../utils/Publisher';
-import { Messages } from '@shared/Messages';
 import type { InferenceManager } from '../inference/inferenceManager';
 import type { ModelsManager } from '../modelsManager';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
@@ -41,31 +40,24 @@ import type { TaskRegistry } from '../../registries/TaskRegistry';
 import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 import ilabBaseConfig from '../../assets/instructlab-base-config.yaml?raw';
 import { DISABLE_SELINUX_LABEL_SECURITY_OPTION } from '../../utils/utils';
+import type { InstructLabRegistry } from '../../registries/instructlab/InstructLabRegistry';
 
 export const ILAB_IMAGE = 'localhost/ilab:0.19.3-1729081109';
 
 export const ILAB_LABEL = 'instructlab';
 
-export class InstructlabManager extends Publisher<InstructlabSession[]> implements Disposable {
-  // session uid => session
-  #sessions: Map<string, InstructlabSession>;
-
+export class InstructlabManager implements Disposable {
   constructor(
-    webview: Webview,
     private appUserDirectory: string,
     private modelsManager: ModelsManager,
     private podman: PodmanConnection,
     private inferenceManager: InferenceManager,
     private git: GitManager,
     private taskRegistry: TaskRegistry,
-  ) {
-    super(webview, Messages.MSG_INSTRUCTLAB_SESSIONS_UPDATE, () => this.getSessions());
-    this.#sessions = new Map();
-  }
+    private sessionsRegistry: InstructLabRegistry,
+  ) {}
 
-  public dispose(): void {
-    this.#sessions.clear();
-  }
+  public dispose(): void {}
 
   protected getSessionDirectory(session: InstructlabSession): string {
     return join(this.appUserDirectory, 'instructlab', session.uid);
@@ -128,11 +120,6 @@ export class InstructlabManager extends Publisher<InstructlabSession[]> implemen
     return trackingId;
   }
 
-  protected register(session: InstructlabSession): void {
-    this.#sessions.set(session.uid, session);
-    this.notify();
-  }
-
   protected async initSession(session: InstructlabSession): Promise<void> {
     // ensure the directory exist
     await mkdir(this.getSessionDatasetDirectory(session), { recursive: true });
@@ -174,7 +161,7 @@ export class InstructlabManager extends Publisher<InstructlabSession[]> implemen
     this.taskRegistry.updateTask({ ...populateTask, state: 'success' });
 
     // register the session
-    this.register(session);
+    this.sessionsRegistry.register(session);
 
     return session;
   }
@@ -193,23 +180,11 @@ export class InstructlabManager extends Publisher<InstructlabSession[]> implemen
     }
   }
 
-  public get(uid: string): InstructlabSession {
-    const session = this.#sessions.get(uid);
-    if(!session) throw new Error(`unknown session uid ${uid}`);
-    return session;
-  }
 
-  protected setState(session: InstructlabSession, state: InstructLabState): void {
-    this.#sessions.set(session.uid, {
-      ...session,
-      state: state,
-    });
-    this.notify();
-  }
 
   public async requestGenerate(uid: string): Promise<void> {
-    const session = this.get(uid);
-    this.setState(session, InstructLabState.GENERATING);
+    this.sessionsRegistry.setState(uid, InstructLabState.GENERATING);
+    const session = this.sessionsRegistry.get(uid);
 
     // Get the instruct model
     const instructModelInfo: ModelInfo = this.modelsManager.getModelInfo(session.instructModelId);
@@ -303,9 +278,5 @@ export class InstructlabManager extends Publisher<InstructlabSession[]> implemen
     server = this.inferenceManager.get(serverId);
     if(!server) throw new Error(`Something went wrong while trying to get inference server with id ${serverId}`);
     return server;
-  }
-
-  public getSessions(): InstructlabSession[] {
-    return Array.from(this.#sessions.values());
   }
 }
