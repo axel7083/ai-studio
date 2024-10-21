@@ -32,7 +32,8 @@ let knowledgeFiles: string[] = $state([]);
 let valid: boolean = $state(false);
 
 let sessionName: string = $state('');
-let model: ModelInfo | undefined = $state(undefined);
+let teacherModel: ModelInfo | undefined = $state(undefined);
+let targetModel: string = $state('instructlab/granite-7b-lab');
 
 let trainingType: 'knowledge' | 'skills' = $state('knowledge');
 
@@ -41,7 +42,7 @@ let loading = $state(false);
 let completed: boolean = $state(false);
 
 $effect(() => {
-  valid = (skillsFiles.length > 0 || knowledgeFiles.length > 0) && !!model && sessionName.length > 0;
+  valid = (skillsFiles.length > 0 || knowledgeFiles.length > 0) && !!teacherModel && sessionName.length > 0;
 });
 
 function goToUpPage(): void {
@@ -114,17 +115,17 @@ const processTasks = (trackedTasks: Task[]): void => {
 };
 
 async function submit(): Promise<void> {
-  if(!model || !sessionName) return;
+  if(!teacherModel || !sessionName) return;
   // take snapshot
-  const mModel = $state.snapshot(model);
+  const mModel = $state.snapshot(teacherModel);
 
   try {
     const trackingId = await instructlabClient.requestNewSession({
       files: $state.snapshot(trainingType) === 'skills' ? $state.snapshot(skillsFiles) : $state.snapshot(knowledgeFiles),
       labels: {},
       name: $state.snapshot(sessionName),
-      targetModelId: mModel.id,
-      instructModelId: mModel.id,
+      targetModel: $state.snapshot(targetModel),
+      teacherModelId: mModel.id,
       training: $state.snapshot(trainingType) === 'skills' ? TRAINING.SKILLS : TRAINING.KNOWLEDGE,
     });
     router.location.query.set('trackingId', trackingId);
@@ -158,8 +159,18 @@ async function submit(): Promise<void> {
           <!-- model input -->
           <div>
             <label for="model" class="pt-4 block mb-2 font-bold text-[var(--pd-content-card-header-text)]"
-              >Model to Fine Tune</label>
-            <ModelSelect models={$modelsInfo} disabled={false} bind:value={model} />
+              >Teacher model</label>
+            <ModelSelect models={$modelsInfo} disabled={false} bind:value={teacherModel} />
+          </div>
+
+          <!-- target model -->
+          <div>
+            <label for="target-model-name" class="pt-4 block mb-2 font-bold text-[var(--pd-content-card-header-text)]"
+            >Target model</label>
+            <Input bind:value={targetModel} class="grow" name="target-model-name" aria-label="target model name" />
+
+            <span class="text-[var(--pd-table-body-text)]"
+            >Target model must be a hugging face repository</span>
           </div>
 
           <!-- session name -->

@@ -27,4 +27,8 @@ export abstract class InstructlabAPI {
 
   abstract requestNewSession(config: InstructLabSessionConfig): Promise<string>;
   abstract requestGenerateSession(uid: string): Promise<void>;
+
+  abstract openSessionDirectory(uid: string): Promise<boolean>;
+
+  abstract abortSession(uid: string): Promise<void>;
 }

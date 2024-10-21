@@ -1,0 +1,9 @@
+FROM registry.access.redhat.com/ubi9/python-311:1-77.1725907703
+
+RUN CMAKE_ARGS="-DLLAMA_METAL=off" pip install instructlab
+
+RUN ilab config init --taxonomy-path /opt/app-root/src/taxonomy --non-interactive
+RUN rm -r /opt/app-root/src/taxonomy
+RUN git config --global --add safe.directory /mnt/taxonomy
+
+ENTRYPOINT ["ilab"]

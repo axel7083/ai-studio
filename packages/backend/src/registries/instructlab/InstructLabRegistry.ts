@@ -18,6 +18,7 @@
 import { Publisher } from '../../utils/Publisher';
 import type { Disposable, Webview } from '@podman-desktop/api';
 import type {
+  InstructlabContainer,
   InstructlabSession,
   InstructLabSessions,
   InstructLabState,
@@ -55,7 +56,7 @@ export class InstructLabRegistry extends Publisher<InstructlabSession[]> impleme
     return session;
   }
 
-  public setState(uid: string, state: InstructLabState): void {
+  public setState(uid: string, state: InstructLabState, notify: boolean = true): void {
     const session = this.get(uid);
     this.#sessions.set(session.uid, {
       ...session,
@@ -67,6 +68,21 @@ export class InstructLabRegistry extends Publisher<InstructlabSession[]> impleme
 
   public register(session: InstructlabSession): void {
     this.#sessions.set(session.uid, session);
+    this.notify();
+    this.flush();
+  }
+
+  // not sure about that
+  public registerContainer(uid: string, container: InstructlabContainer): void {
+    const session = this.get(uid);
+    const containers = (session.containers ?? []).filter(
+      mContainer => container.connection.containerId === mContainer.connection.containerId
+    );
+
+    this.#sessions.set(session.uid, {
+      ...session,
+      containers: [...containers, container],
+    });
     this.notify();
     this.flush();
   }
@@ -138,8 +154,8 @@ export class InstructLabRegistry extends Publisher<InstructlabSession[]> impleme
       if(!('uid' in session) || typeof session.uid !== 'string') throw new Error(`invalid uid for session in ${sessionsFile}`);
       if(!('baseImage' in session) || typeof session.baseImage !== 'string') throw new Error(`invalid baseImage for session ${session.uid}`);
       if(!('name' in session) || typeof session.name !== 'string' && !isNameValid(session.name)) throw new Error(`invalid name for session ${session.uid}`);
-      if(!('instructModelId' in session) || typeof session.instructModelId !== 'string') throw new Error(`invalid instructModelId for session ${session.uid}`);
-      if(!('targetModelId' in session) || typeof session.targetModelId !== 'string') throw new Error(`invalid targetModelId for session ${session.uid}`);
+      if(!('teacherModelId' in session) || typeof session.teacherModelId !== 'string') throw new Error(`invalid teacherModelId for session ${session.uid}`);
+      if(!('targetModel' in session) || typeof session.targetModel !== 'string') throw new Error(`invalid targetModel for session ${session.uid}`);
       if(!('repository' in session) || typeof session.repository !== 'string') throw new Error(`invalid repository for session ${session.uid}`);
       if(!('createdTime' in session) || typeof session.createdTime !== 'number') throw new Error(`invalid createdTime for session ${session.uid}`);
       if(!('training' in session) || typeof session.training !== 'string') throw new Error(`invalid training for session ${session.uid}`);

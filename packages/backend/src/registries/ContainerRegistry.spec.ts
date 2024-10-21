@@ -143,7 +143,7 @@ test('ContainerRegistry subscriber disposed should not be called', () => {
   expect(subscribeMock).toHaveBeenCalledTimes(0);
 });
 
-test('ContainerRegistry should fire ContainerStart when container start', () => {
+test('ContainerRegistry should fire ContainerEvent when container start', () => {
   // Get the callback created by the ContainerRegistry
   let callback: ((event: ContainerJSONEvent) => void) | undefined;
   mocks.onEventMock.mockImplementation((method: (event: ContainerJSONEvent) => void) => {
