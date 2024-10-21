@@ -1,44 +1,56 @@
 <script lang="ts">
 import { faGaugeHigh, faPlusCircle } from '@fortawesome/free-solid-svg-icons';
-import { Button, EmptyScreen, NavPage, Tab, Table, TableColumn, TableRow } from '@podman-desktop/ui-svelte';
+import { Button, EmptyScreen, NavPage, Tab, Table, TableColumn, TableRow, TableDurationColumn } from '@podman-desktop/ui-svelte';
 import { onMount } from 'svelte';
 import { instructlabSessions } from '../stores/instructlabSessions';
 import { type InstructlabSession, InstructLabState } from '@shared/src/models/instructlab/IInstructlabSession';
 import InstructlabColumnName from '../lib/table/instructlab/InstructlabColumnName.svelte';
 import InstructlabColumnModelName from '../lib/table/instructlab/InstructlabColumnModelName.svelte';
 import InstructlabColumnRepository from '../lib/table/instructlab/InstructlabColumnRepository.svelte';
-import InstructlabColumnTargetModelName from '../lib/table/instructlab/InstructlabColumnTargetModelName.svelte';
-import InstructlabColumnAge from '../lib/table/instructlab/InstructlabColumnAge.svelte';
 import InstructlabColumnStatus from '../lib/table/instructlab/InstructlabColumnStatus.svelte';
 import { router } from 'tinro';
 import Route from '../Route.svelte';
+import InstructlabStatusIcon from '/@/lib/table/instructlab/InstructlabStatusIcon.svelte';
+import SessionAction from '/@/lib/table/instructlab/SessionAction.svelte';
 
 function start(): void {
-router.goto('/tune/start');
+  router.goto('/tune/start');
 }
 
-const columns: TableColumn<InstructlabSession>[] = [
-  new TableColumn<InstructlabSession>('Name', { width: '120px', renderer: InstructlabColumnName, align: 'left' }),
-  new TableColumn<InstructlabSession>('Model', { width: '1fr', renderer: InstructlabColumnModelName, align: 'left' }),
+const columns = [
+  // status icon
+  new TableColumn<InstructlabSession>('Status', { width: '60px', renderer: InstructlabStatusIcon, align: 'left' }),
+  // state (initialized, generating, fine-tuning, completed)
+  new TableColumn<InstructlabSession>('Stage', { width: '70px', renderer: InstructlabColumnStatus, align: 'left' }),
+  // session name
+  new TableColumn<InstructlabSession>('Name', { width: '100px', renderer: InstructlabColumnName, align: 'left' }),
+  // target model
+  new TableColumn<InstructlabSession>('Teacher Model', { width: '1fr', renderer: InstructlabColumnModelName, align: 'left' }),
+  // repository used
   new TableColumn<InstructlabSession>('Repository', {
-    width: '100px',
+    width: '1fr',
     renderer: InstructlabColumnRepository,
     align: 'left',
   }),
-  new TableColumn<InstructlabSession>('Duration', { width: '70px', renderer: InstructlabColumnAge }),
-  new TableColumn<InstructlabSession>('Stage', { width: '80px', renderer: InstructlabColumnStatus, align: 'left' }),
-  new TableColumn<InstructlabSession>('Target model', {
-    width: '1fr',
-    renderer: InstructlabColumnTargetModelName,
-    align: 'left',
+  // session age
+  new TableColumn<InstructlabSession, Date | undefined>('Age', {
+    width: '70px',
+    renderer: TableDurationColumn,
+    renderMapping: (session): Date => new Date(session.createdTime),
+  }),
+  // actions
+  new TableColumn<InstructlabSession>('Actions', {
+    width: '100px',
+    renderer: SessionAction,
+    align: 'right',
   }),
 ];
 const row = new TableRow<InstructlabSession>({});
 
 let data: InstructlabSession[] = $state([]);
 
-let running = $derived(data.filter(t => t.state !== InstructLabState.COMPLETED));
-let completed = $derived(data.filter(t => t.state === InstructLabState.COMPLETED));
+let running = $derived(data.filter(t => t.state !== InstructLabState.TRAINING_COMPLETED));
+let completed = $derived(data.filter(t => t.state === InstructLabState.TRAINING_COMPLETED));
 
 onMount(() => {
   return instructlabSessions.subscribe(items => {

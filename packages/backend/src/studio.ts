@@ -294,7 +294,9 @@ export class Studio {
       gitManager,
       this.#taskRegistry,
       this.#instructLabSessionRegistry,
+      this.#containerRegistry,
     );
+    this.#instructlabManager.init();
     this.#extensionContext.subscriptions.push(this.#instructlabManager);
 
     /**

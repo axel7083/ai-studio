@@ -5,13 +5,14 @@ import { catalog } from '/@/stores/catalog';
 
 export let object: InstructlabSession;
 
-$: name = $catalog.models.find(r => r.id === object.modelId)?.name;
+let modelName: string | undefined;
+$: modelName = $catalog.models.find(r => r.id === object.teacherModelId)?.name;
 
 function openDetails(): void {
-  router.goto(`/model/${object.modelId}`);
+  router.goto(`/model/${object.teacherModelId}`);
 }
 </script>
 
 <button title="Open model details" class="text-[var(--pd-table-body-text-highlight)]" on:click={openDetails}>
-  {name}
+  {modelName}
 </button>

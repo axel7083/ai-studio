@@ -41,12 +41,17 @@ import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 import ilabBaseConfig from '../../assets/instructlab-base-config.yaml?raw';
 import { DISABLE_SELINUX_LABEL_SECURITY_OPTION } from '../../utils/utils';
 import type { InstructLabRegistry } from '../../registries/instructlab/InstructLabRegistry';
+import type { ContainerRegistry } from '../../registries/ContainerRegistry';
 
-export const ILAB_IMAGE = 'localhost/ilab:0.19.3-1729081109';
+export const ILAB_IMAGE = 'localhost/ilab:cpu-1729507671';
 
 export const ILAB_LABEL = 'instructlab';
+export const ILAB_INFERENCE = 'instructlab-inference';
 
 export class InstructlabManager implements Disposable {
+
+  #containersEvent: Disposable | undefined;
+
   constructor(
     private appUserDirectory: string,
     private modelsManager: ModelsManager,
@@ -55,16 +60,74 @@ export class InstructlabManager implements Disposable {
     private git: GitManager,
     private taskRegistry: TaskRegistry,
     private sessionsRegistry: InstructLabRegistry,
+    private containers: ContainerRegistry,
   ) {}
 
-  public dispose(): void {}
+  public dispose(): void {
+    this.#containersEvent?.dispose();
+  }
 
-  protected getSessionDirectory(session: InstructlabSession): string {
+  public init(): void {
+    this.#containersEvent = this.containers.onDieContainerEvent(async ({ id }) => {
+      const sessions = this.sessionsRegistry.getSessions();
+      const session = sessions.find(session => session.containers.some(container => container.connection.containerId = id));
+      if(!session) return;
+
+      const container = session.containers.find(container => container.connection.containerId = id);
+      if(!container) throw new Error('missing container in session containers');
+
+      const exitCode = await this.getContainerExitCode(container.connection.engineId, container.connection.containerId);
+
+      if(exitCode !== 0) {
+        // container failed
+        switch (session.state) {
+          case InstructLabState.GENERATING:
+            // restore previous state as generating failed
+            this.sessionsRegistry.setState(session.uid, InstructLabState.INITIALIZED);
+            break;
+          case InstructLabState.FINE_TUNING:
+            // restore previous state as generating failed
+            this.sessionsRegistry.setState(session.uid, InstructLabState.GENERATING_COMPLETED);
+            break;
+        }
+      } else {
+        // success
+        switch (session.state) {
+          case InstructLabState.GENERATING:
+            // restore previous state as generating failed
+            this.sessionsRegistry.setState(session.uid, InstructLabState.GENERATING_COMPLETED);
+            break;
+          case InstructLabState.FINE_TUNING:
+            // restore previous state as generating failed
+            this.sessionsRegistry.setState(session.uid, InstructLabState.TRAINING_COMPLETED);
+            break;
+        }
+      }
+    });
+  }
+
+  protected async getContainerExitCode(engineId: string, containerId: string): Promise<number> {
+    try {
+      // the container might already be removed when we try to inspect it
+      const result = await containerEngine.inspectContainer(engineId, containerId);
+      if(result.State.Status !== 'exited') return -1;
+      return result.State.ExitCode ?? -1;
+    } catch (err: unknown) {
+      console.error(err);
+      return -1;
+    }
+  }
+
+  public getSessionDirectory(session: InstructlabSession): string {
     return join(this.appUserDirectory, 'instructlab', session.uid);
   }
 
   protected getSessionRepositoryDirectory(session: InstructlabSession): string {
     return join(this.getSessionDirectory(session), 'taxonomy');
+  }
+
+  protected getSessionCheckpointsDirectory(session: InstructlabSession): string {
+    return join(this.getSessionDirectory(session), 'checkpoints');
   }
 
   protected getSessionDatasetDirectory(session: InstructlabSession): string {
@@ -120,9 +183,41 @@ export class InstructlabManager implements Disposable {
     return trackingId;
   }
 
+  public async abortSession(uid: string): Promise<void> {
+    const session = this.sessionsRegistry.get(uid);
+
+    try {
+      await Promise.allSettled(
+        (session.containers ?? []).map(container => containerEngine.stopContainer(
+            container.connection.engineId,
+            container.connection.containerId,
+          ),
+        ),
+      );
+    } catch (err: unknown) {
+      console.error('Something went wrong while trying to stop all session container', err);
+    } finally {
+       // restore previous state if needed
+       switch (session.state) {
+         case InstructLabState.SETUP_GENERATE:
+         case InstructLabState.GENERATING:
+           this.sessionsRegistry.setState(uid, InstructLabState.INITIALIZED);
+           break;
+         case InstructLabState.SETUP_FINE_TUNE:
+         case InstructLabState.FINE_TUNING:
+           this.sessionsRegistry.setState(uid, InstructLabState.GENERATING_COMPLETED);
+           break;
+         default:
+           break;
+       }
+    }
+  }
+
   protected async initSession(session: InstructlabSession): Promise<void> {
     // ensure the directory exist
     await mkdir(this.getSessionDatasetDirectory(session), { recursive: true });
+    await mkdir(this.getSessionCheckpointsDirectory(session), { recursive: true });
+
     // get the configuration path
     const path = this.getSessionConfigurationPath(session);
     // write content
@@ -135,16 +230,16 @@ export class InstructlabManager implements Disposable {
       uid: randomUUID(),
       createdTime: new Date().getTime(),
       repository: config.repository ?? 'https://github.com/instructlab/taxonomy',
-      instructModelId: config.instructModelId,
-      targetModelId: config.targetModelId,
+      teacherModelId: config.teacherModelId,
+      targetModel: config.targetModel,
       state: InstructLabState.INITIALIZED,
       labels: config.labels,
       training: config.training,
       baseImage: ILAB_IMAGE,
+      containers: [],
     };
 
     // init configuration
-    console.log('init session (create folders)');
     await this.initSession(session);
 
     const cloneTask = this.taskRegistry.createTask(`Cloning ${session.repository}`, 'loading', config.labels);
@@ -180,14 +275,12 @@ export class InstructlabManager implements Disposable {
     }
   }
 
-
-
   public async requestGenerate(uid: string): Promise<void> {
-    this.sessionsRegistry.setState(uid, InstructLabState.GENERATING);
+    this.sessionsRegistry.setState(uid, InstructLabState.SETUP_GENERATE);
     const session = this.sessionsRegistry.get(uid);
 
     // Get the instruct model
-    const instructModelInfo: ModelInfo = this.modelsManager.getModelInfo(session.instructModelId);
+    const instructModelInfo: ModelInfo = this.modelsManager.getModelInfo(session.teacherModelId);
 
     // get an inference server with our instruct model
     const serverTask = this.taskRegistry.createTask(`Starting an inference server`, 'loading', session.labels);
@@ -195,9 +288,20 @@ export class InstructlabManager implements Disposable {
     this.taskRegistry.updateTask({...serverTask, state: 'success'});
 
     // start the generate task
-    const generateTask = this.taskRegistry.createTask(`Generating dataset`, 'loading', session.labels);
-    await this.startGenerate(session, server);
-    this.taskRegistry.updateTask({...generateTask, state: 'success'});
+    this.sessionsRegistry.setState(uid, InstructLabState.GENERATING);
+    const generateTask = this.taskRegistry.createTask(`Start generating container`, 'loading', session.labels);
+
+    try {
+      await this.startGenerate(session, server);
+      this.taskRegistry.updateTask({...generateTask, state: 'success'});
+    } catch (err: unknown) {
+      this.taskRegistry.updateTask({...generateTask, state: 'error', error: `Something went wrong while starting generate task: ${err}`});
+      // aborting to ensure state is not problematic
+      this.abortSession(uid).catch((err: unknown) => {
+        console.error('Something went wrong while trying to abort', err);
+      });
+      throw err;
+    }
   }
 
   protected async startGenerate(session: InstructlabSession, server: InferenceServer): Promise<ContainerCreateResult > {
@@ -209,15 +313,16 @@ export class InstructlabManager implements Disposable {
     const images = await containerEngine.listImages({
       provider: connection,
     });
-    const image = images.find(image => image.RepoTags?.[0] === session.baseImage);
+    const image = images.find(image => image.RepoTags?.some((tag) => tag === session.baseImage));
     if(!image) throw new Error(`cannot found corresponding image to ${session.baseImage}`);
 
-    return containerEngine.createContainer(image.engineId, {
+    const result = await containerEngine.createContainer(image.engineId, {
       name: `${session.name}-generate`,
       Image: image.Id,
       Labels: {
         ...session.labels,
         [ILAB_LABEL]: 'generate',
+        [ILAB_INFERENCE]: server.container.containerId,
       },
       Detach: true,
       HostConfig: {
@@ -234,13 +339,31 @@ export class InstructlabManager implements Disposable {
             Type: 'bind',
           },
           {
-            Target: '/opt/app/root/src/.config/instructlab/config.yaml',
+            Target: '/opt/app-root/src/.config/instructlab/config.yaml',
             Source: this.getSessionConfigurationPath(session),
             Type: 'bind',
+            ReadOnly: true,
           }],
       },
-      Cmd: ['generate', `--endpoint-url=http://host.containers.internal:${server.connection.port}`],
+      Cmd: [
+        'generate',
+        // use the endpoint of our inference server
+        `--endpoint-url=http://host.containers.internal:${server.connection.port}/v1`,
+        // taxonomy path should be the mounted taxonomy path
+        '--taxonomy-path=/mnt/taxonomy',
+        // output dir should be the mounted dataset path
+        '--output-dir=/mnt/dataset',
+      ],
     });
+    // register the container to the session
+    this.sessionsRegistry.registerContainer(session.uid, {
+      connection: {
+        engineId: result.engineId,
+        containerId: result.id,
+      },
+    });
+
+    return result;
   }
 
   /**

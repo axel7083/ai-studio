@@ -20,6 +20,7 @@ import type { InstructlabAPI } from '@shared/src/InstructlabAPI';
 import type { InstructlabManager } from './managers/instructlab/instructlabManager';
 import type { InstructlabSession, InstructLabSessionConfig } from '@shared/src/models/instructlab/IInstructlabSession';
 import type { InstructLabRegistry } from './registries/instructlab/InstructLabRegistry';
+import { env, Uri } from '@podman-desktop/api';
 
 export class InstructlabApiImpl implements InstructlabAPI {
   constructor(
@@ -36,5 +37,17 @@ export class InstructlabApiImpl implements InstructlabAPI {
 
   async requestGenerateSession(uid: string): Promise<void> {
     return this.instructlabManager.requestGenerate(uid);
+  }
+
+  async openSessionDirectory(uid: string): Promise<boolean> {
+    const session = this.instructLabSessions.get(uid);
+
+    return env.openExternal(Uri.file(
+      this.instructlabManager.getSessionDirectory(session),
+    ));
+  }
+
+  async abortSession(uid: string): Promise<void> {
+    return this.instructlabManager.abortSession(uid);
   }
 }

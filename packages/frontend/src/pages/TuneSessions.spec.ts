@@ -71,8 +71,8 @@ test('should display sessions', async () => {
     {
       uid: 'session-1-uid',
       name: 'session 1',
-      instructModelId: 'model1',
-      targetModelId: 'model1-target',
+      teacherModelId: 'model1',
+      targetModel: 'model1-target',
       repository: '/repo1',
       state: InstructLabState.GENERATING,
       status: 'initializing',
@@ -84,8 +84,8 @@ test('should display sessions', async () => {
     {
       uid: 'session-2-uid',
       name: 'session 2',
-      instructModelId: 'model2',
-      targetModelId: 'model2-target',
+      teacherModelId: 'model2',
+      targetModel: 'model2-target',
       repository: '/repo2',
       state: InstructLabState.GENERATING,
       status: 'initializing',

@@ -22,35 +22,53 @@ export type Subscriber = {
   callback: (status: string) => void;
 };
 
-export interface ContainerStart {
+export interface ContainerEvent {
   id: string;
 }
 
 export class ContainerRegistry implements podmanDesktopApi.Disposable {
   private count: number = 0;
-  private subscribers: Map<string, Subscriber[]> = new Map();
+  private startSubscribers: Map<string, Subscriber[]> = new Map();
 
-  private readonly _onStartContainerEvent = new podmanDesktopApi.EventEmitter<ContainerStart>();
-  readonly onStartContainerEvent: podmanDesktopApi.Event<ContainerStart> = this._onStartContainerEvent.event;
+  private readonly _onStartContainerEvent = new podmanDesktopApi.EventEmitter<ContainerEvent>();
+  readonly onStartContainerEvent: podmanDesktopApi.Event<ContainerEvent> = this._onStartContainerEvent.event;
+
+  private readonly _onDieContainerEvent = new podmanDesktopApi.EventEmitter<ContainerEvent>();
+  readonly onDieContainerEvent: podmanDesktopApi.Event<ContainerEvent> = this._onDieContainerEvent.event;
 
   #eventDisposable: podmanDesktopApi.Disposable | undefined;
 
   init(): void {
     this.#eventDisposable = podmanDesktopApi.containerEngine.onEvent(event => {
-      if (event.status === 'start') {
-        this._onStartContainerEvent.fire({
-          id: event.id,
-        });
+      switch (event.status) {
+        case 'start':
+          this.onContainerStart(event.id);
+          break;
+        case 'die':
+          this.onContainerDie(event.id);
+          break;
       }
 
-      if (this.subscribers.has(event.id)) {
-        this.subscribers.get(event.id)?.forEach(subscriber => subscriber.callback(event.status));
+      if (this.startSubscribers.has(event.id)) {
+        this.startSubscribers.get(event.id)?.forEach(subscriber => subscriber.callback(event.status));
 
-        // If the event type is remove, we dispose all subscribers for the specific containers
+        // If the event type is remove, we dispose all startSubscribers for the specific containers
         if (event.status === 'remove') {
-          this.subscribers.delete(event.id);
+          this.startSubscribers.delete(event.id);
         }
       }
+    });
+  }
+
+  protected onContainerStart(id: string): void {
+    this._onStartContainerEvent.fire({
+      id: id,
+    });
+  }
+
+  protected onContainerDie(id: string): void {
+    this._onDieContainerEvent.fire({
+      id: id,
     });
   }
 
@@ -61,18 +79,18 @@ export class ContainerRegistry implements podmanDesktopApi.Disposable {
   subscribe(containerId: string, callback: (status: string) => void): podmanDesktopApi.Disposable {
     const subscriberId = ++this.count;
     const nSubs: Subscriber[] = [
-      ...(this.subscribers.get(containerId) ?? []),
+      ...(this.startSubscribers.get(containerId) ?? []),
       {
         id: subscriberId,
         callback: callback,
       },
     ];
 
-    this.subscribers.set(containerId, nSubs);
+    this.startSubscribers.set(containerId, nSubs);
     return podmanDesktopApi.Disposable.create(() => {
-      if (!this.subscribers.has(containerId)) return;
+      if (!this.startSubscribers.has(containerId)) return;
 
-      this.subscribers.set(
+      this.startSubscribers.set(
         containerId,
         nSubs.filter(subscriber => subscriber.id !== subscriberId),
       );

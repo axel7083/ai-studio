@@ -1,0 +1,8 @@
+FROM ghcr.io/containers/podman-desktop-extension-ai-lab-playground-images/ai-lab-playground-chat-cuda:0.5.1
+
+RUN pip install instructlab[cuda]
+
+RUN ilab config init --taxonomy-path /opt/app-root/src/taxonomy --non-interactive
+RUN rm -r /opt/app-root/src/taxonomy
+
+ENTRYPOINT ["ilab"]

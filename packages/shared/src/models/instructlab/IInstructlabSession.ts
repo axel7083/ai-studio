@@ -19,14 +19,25 @@ import type { ContainerProviderConnectionInfo } from '../IContainerConnectionInf
 
 export enum InstructLabState {
   INITIALIZED = 'initialized',
+  SETUP_GENERATE = 'setup-generate',
   GENERATING = 'generating',
+  GENERATING_COMPLETED = 'generating-completed',
+  SETUP_FINE_TUNE = 'setup-fine-tune',
   FINE_TUNING = 'fine-tuning',
-  COMPLETED = 'completed',
+  TRAINING_COMPLETED = 'training-completed',
 }
 
 export enum TRAINING {
   SKILLS = 'skills',
   KNOWLEDGE = 'knowledge',
+}
+
+export interface InstructlabContainer {
+  // connection of the container
+  connection: {
+    engineId: string;
+    containerId: string;
+  }
 }
 
 export interface InstructlabSession {
@@ -43,8 +54,8 @@ export interface InstructlabSession {
   name: string;
 
   // models
-  instructModelId: string;
-  targetModelId: string;
+  teacherModelId: string;
+  targetModel: string;
 
   // taxonomy
   repository: string;
@@ -59,6 +70,11 @@ export interface InstructlabSession {
    * Labels to propagate
    */
   labels: { [id: string]: string };
+
+  /**
+   * during the instructlab process several containers will be used (generating dataset, training)
+   */
+  containers: InstructlabContainer[];
 }
 
 export interface InstructLabSessionConfig {
@@ -75,11 +91,11 @@ export interface InstructLabSessionConfig {
   /**
    * Model that will be used to generate the synthetic data
    */
-  instructModelId: string;
+  teacherModelId: string;
   /**
-   * Model that will be fine-tuned
+   * Model that will be fine-tuned (must be hugging face repository)
    */
-  targetModelId: string;
+  targetModel: string;
   /**
    * Labels to propagate
    */
@@ -90,3 +106,4 @@ export interface InstructLabSessions {
   version: '1.0',
   sessions: InstructlabSession[];
 }
+
