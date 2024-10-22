@@ -50,4 +50,8 @@ export class InstructlabApiImpl implements InstructlabAPI {
   async abortSession(uid: string): Promise<void> {
     return this.instructlabManager.abortSession(uid);
   }
+
+  async requestTrainSession(uid: string): Promise<void> {
+    return this.instructlabManager.requestTrain(uid);
+  }
 }

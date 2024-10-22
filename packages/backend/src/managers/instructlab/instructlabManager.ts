@@ -16,14 +16,13 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type {
-  InstructlabSession,
-  InstructLabSessionConfig} from '@shared/src/models/instructlab/IInstructlabSession';
 import {
+  InstructlabSession,
+  InstructLabSessionConfig,
   InstructLabState,
   TRAINING,
 } from '@shared/src/models/instructlab/IInstructlabSession';
-import type { ContainerCreateResult, ContainerProviderConnection, Disposable } from '@podman-desktop/api';
+import type { ContainerCreateResult, ContainerProviderConnection, Disposable, ImageInfo } from '@podman-desktop/api';
 import { containerEngine } from '@podman-desktop/api';
 import type { InferenceManager } from '../inference/inferenceManager';
 import type { ModelsManager } from '../modelsManager';
@@ -37,7 +36,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { getRandomString } from '../../utils/randomUtils';
 import type { TaskRegistry } from '../../registries/TaskRegistry';
-import { mkdir, writeFile, copyFile } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import ilabBaseConfig from '../../assets/instructlab-base-config.yaml?raw';
 import { DISABLE_SELINUX_LABEL_SECURITY_OPTION } from '../../utils/utils';
 import type { InstructLabRegistry } from '../../registries/instructlab/InstructLabRegistry';
@@ -130,7 +129,7 @@ export class InstructlabManager implements Disposable {
     return join(this.getSessionDirectory(session), 'checkpoints');
   }
 
-  protected getSessionDatasetDirectory(session: InstructlabSession): string {
+  protected getSessionDatasetsDirectory(session: InstructlabSession): string {
     return join(this.getSessionDirectory(session), 'datasets');
   }
 
@@ -215,7 +214,7 @@ export class InstructlabManager implements Disposable {
 
   protected async initSession(session: InstructlabSession): Promise<void> {
     // ensure the directory exist
-    await mkdir(this.getSessionDatasetDirectory(session), { recursive: true });
+    await mkdir(this.getSessionDatasetsDirectory(session), { recursive: true });
     await mkdir(this.getSessionCheckpointsDirectory(session), { recursive: true });
 
     // get the configuration path
@@ -304,7 +303,7 @@ export class InstructlabManager implements Disposable {
     }
   }
 
-  protected async startGenerate(session: InstructlabSession, server: InferenceServer): Promise<ContainerCreateResult > {
+  protected async getImage(session: InstructlabSession): Promise<ImageInfo> {
     let connection: ContainerProviderConnection | undefined;
     if(session.connection) {
       connection = this.podman.getContainerProviderConnection(session.connection);
@@ -315,6 +314,11 @@ export class InstructlabManager implements Disposable {
     });
     const image = images.find(image => image.RepoTags?.some((tag) => tag === session.baseImage));
     if(!image) throw new Error(`cannot found corresponding image to ${session.baseImage}`);
+    return image;
+  }
+
+  protected async startGenerate(session: InstructlabSession, server: InferenceServer): Promise<ContainerCreateResult > {
+    const image = await this.getImage(session);
 
     const result = await containerEngine.createContainer(image.engineId, {
       name: `${session.name}-generate`,
@@ -334,8 +338,8 @@ export class InstructlabManager implements Disposable {
             Type: 'bind',
           },
           {
-            Target: '/mnt/dataset',
-            Source: this.getSessionDatasetDirectory(session),
+            Target: '/mnt/datasets',
+            Source: this.getSessionDatasetsDirectory(session),
             Type: 'bind',
           },
           {
@@ -352,7 +356,81 @@ export class InstructlabManager implements Disposable {
         // taxonomy path should be the mounted taxonomy path
         '--taxonomy-path=/mnt/taxonomy',
         // output dir should be the mounted dataset path
-        '--output-dir=/mnt/dataset',
+        '--output-dir=/mnt/datasets',
+      ],
+    });
+    // register the container to the session
+    this.sessionsRegistry.registerContainer(session.uid, {
+      connection: {
+        engineId: result.engineId,
+        containerId: result.id,
+      },
+    });
+
+    return result;
+  }
+
+  public async requestTrain(uid: string): Promise<void> {
+    const session = this.sessionsRegistry.get(uid);
+    if(session.state !== InstructLabState.GENERATING_COMPLETED) throw new Error(`cannot start training on invalid state: expected ${InstructLabState.GENERATING_COMPLETED} got ${session.state}`);
+
+    // setup fine tuning
+    this.sessionsRegistry.setState(uid, InstructLabState.SETUP_FINE_TUNE);
+
+    // start the generate task
+    this.sessionsRegistry.setState(uid, InstructLabState.FINE_TUNING);
+    const trainTask = this.taskRegistry.createTask(`Start fine tuning container`, 'loading', session.labels);
+
+    try {
+      await this.startTrain(session);
+      this.taskRegistry.updateTask({...trainTask, state: 'success'});
+    } catch (err: unknown) {
+      this.taskRegistry.updateTask({...trainTask, state: 'error', error: `Something went wrong while starting train task: ${err}`});
+      // aborting to ensure state is not problematic
+      this.abortSession(uid).catch((err: unknown) => {
+        console.error('Something went wrong while trying to abort', err);
+      });
+      throw err;
+    }
+  }
+
+  protected async startTrain(session: InstructlabSession): Promise<ContainerCreateResult> {
+    const image = await this.getImage(session);
+
+    const result = await containerEngine.createContainer(image.engineId, {
+      name: `${session.name}-train`,
+      Image: image.Id,
+      Labels: {
+        ...session.labels,
+        [ILAB_LABEL]: 'train',
+      },
+      Detach: true,
+      HostConfig: {
+        SecurityOpt: [DISABLE_SELINUX_LABEL_SECURITY_OPTION],
+        Mounts: [
+          {
+            Target: '/mnt/datasets',
+            Source: this.getSessionDatasetsDirectory(session),
+            Type: 'bind',
+          },
+          {
+            Target: '/mnt/checkpoints',
+            Source: this.getSessionCheckpointsDirectory(session),
+            Type: 'bind',
+          },
+          {
+            Target: '/opt/app-root/src/.config/instructlab/config.yaml',
+            Source: this.getSessionConfigurationPath(session),
+            Type: 'bind',
+            ReadOnly: true,
+          }],
+      },
+      Cmd: [
+        'train',
+        '--pipeline=simple',
+        '--input-dir=/mnt/datasets',
+        '--ckpt-output-dir=/mnt/checkpoints',
+        `--model-path=${session.targetModel}`,
       ],
     });
     // register the container to the session

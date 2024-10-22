@@ -31,4 +31,6 @@ export abstract class InstructlabAPI {
   abstract openSessionDirectory(uid: string): Promise<boolean>;
 
   abstract abortSession(uid: string): Promise<void>;
+
+  abstract requestTrainSession(uid: string): Promise<void>;
 }
