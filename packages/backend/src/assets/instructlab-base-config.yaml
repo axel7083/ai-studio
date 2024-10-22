@@ -3,6 +3,5 @@ generate:
   taxonomy_path: /mnt/taxonomy
 train:
   ckpt_output_dir: /mnt/checkpoints
-  data_path: /mnt/datasets
 general:
   log_level: DEBUG

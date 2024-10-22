@@ -1,6 +1,6 @@
 <script lang="ts">
 import { type InstructlabSession, InstructLabState } from '@shared/src/models/instructlab/IInstructlabSession';
-import { faCancel, faFolderOpen, faForwardStep } from '@fortawesome/free-solid-svg-icons';
+import { faCancel, faDumbbell, faFolderOpen, faForwardStep } from '@fortawesome/free-solid-svg-icons';
 import ListItemButtonIcon from '/@/lib/button/ListItemButtonIcon.svelte';
 import { instructlabClient } from '/@/utils/client';
 
@@ -34,6 +34,13 @@ function isCancellable(state: InstructLabState): boolean {
   }
 }
 
+function requestStartTraining(): Promise<void> {
+  loading = true;
+  return instructlabClient.requestTrainSession(object.uid).finally(() => {
+    loading = false;
+  });
+}
+
 function abortSession(): Promise<void> {
   loading = true;
   return instructlabClient.abortSession(object.uid).finally(() => {
@@ -45,6 +52,8 @@ function abortSession(): Promise<void> {
 <ListItemButtonIcon icon={faFolderOpen} onClick={openSessionDirectory} title="Open session directory" />
 {#if object.state === InstructLabState.INITIALIZED}
   <ListItemButtonIcon enabled={!loading} icon={faForwardStep} onClick={requestStartGeneratingDatasets} title="Start generating dataset" />
+{:else if object.state === InstructLabState.GENERATING_COMPLETED}
+  <ListItemButtonIcon enabled={!loading} icon={faDumbbell} onClick={requestStartTraining} title="Start training model" />
 {/if}
 
 {#if isCancellable(object.state)}
