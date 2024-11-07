@@ -51,13 +51,19 @@ function abortSession(): Promise<void> {
 
 <ListItemButtonIcon icon={faFolderOpen} onClick={openSessionDirectory} title="Open session directory" />
 {#if object.state === InstructLabState.INITIALIZED}
-  <ListItemButtonIcon enabled={!loading} icon={faForwardStep} onClick={requestStartGeneratingDatasets} title="Start generating dataset" />
+  <ListItemButtonIcon
+    enabled={!loading}
+    icon={faForwardStep}
+    onClick={requestStartGeneratingDatasets}
+    title="Start generating dataset" />
 {:else if object.state === InstructLabState.GENERATING_COMPLETED}
-  <ListItemButtonIcon enabled={!loading} icon={faDumbbell} onClick={requestStartTraining} title="Start training model" />
+  <ListItemButtonIcon
+    enabled={!loading}
+    icon={faDumbbell}
+    onClick={requestStartTraining}
+    title="Start training model" />
 {/if}
 
 {#if isCancellable(object.state)}
   <ListItemButtonIcon enabled={!loading} icon={faCancel} onClick={abortSession} title="Abort session" />
 {/if}
-
-

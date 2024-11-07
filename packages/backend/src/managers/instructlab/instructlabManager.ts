@@ -16,14 +16,10 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import {
-  InstructlabSession,
-  InstructLabSessionConfig,
-  InstructLabState,
-  TRAINING,
-} from '@shared/src/models/instructlab/IInstructlabSession';
+import type { InstructlabSession, InstructLabSessionConfig } from '@shared/src/models/instructlab/IInstructlabSession';
+import { InstructLabState, TRAINING } from '@shared/src/models/instructlab/IInstructlabSession';
 import type { ContainerCreateResult, ContainerProviderConnection, Disposable, ImageInfo } from '@podman-desktop/api';
-import { containerEngine } from '@podman-desktop/api';
+import { containerEngine, env } from '@podman-desktop/api';
 import type { InferenceManager } from '../inference/inferenceManager';
 import type { ModelsManager } from '../modelsManager';
 import type { ModelInfo } from '@shared/src/models/IModelInfo';
@@ -48,7 +44,6 @@ export const ILAB_LABEL = 'instructlab';
 export const ILAB_INFERENCE = 'instructlab-inference';
 
 export class InstructlabManager implements Disposable {
-
   #containersEvent: Disposable | undefined;
 
   constructor(
@@ -69,15 +64,17 @@ export class InstructlabManager implements Disposable {
   public init(): void {
     this.#containersEvent = this.containers.onDieContainerEvent(async ({ id }) => {
       const sessions = this.sessionsRegistry.getSessions();
-      const session = sessions.find(session => session.containers.some(container => container.connection.containerId = id));
-      if(!session) return;
+      const session = sessions.find(session =>
+        session.containers.some(container => (container.connection.containerId = id)),
+      );
+      if (!session) return;
 
-      const container = session.containers.find(container => container.connection.containerId = id);
-      if(!container) throw new Error('missing container in session containers');
+      const container = session.containers.find(container => (container.connection.containerId = id));
+      if (!container) throw new Error('missing container in session containers');
 
       const exitCode = await this.getContainerExitCode(container.connection.engineId, container.connection.containerId);
 
-      if(exitCode !== 0) {
+      if (exitCode !== 0) {
         // container failed
         switch (session.state) {
           case InstructLabState.GENERATING:
@@ -109,7 +106,7 @@ export class InstructlabManager implements Disposable {
     try {
       // the container might already be removed when we try to inspect it
       const result = await containerEngine.inspectContainer(engineId, containerId);
-      if(result.State.Status !== 'exited') return -1;
+      if (result.State.Status !== 'exited') return -1;
       return result.State.ExitCode ?? -1;
     } catch (err: unknown) {
       console.error(err);
@@ -151,33 +148,35 @@ export class InstructlabManager implements Disposable {
     });
 
     // call new session but do not wait for completion
-    this.newSession(config).then((session) => {
-      console.log('new session comppleted');
-      this.taskRegistry.updateTask({
-        ...task,
-        state: 'success',
-        labels: {
-          ...task.labels,
-          sessionId: session.uid,
-        },
-      });
-    }).catch((err: unknown) => {
-      console.log('Something went wrong while creating new session', err);
-      // Get all tasks using the tracker
-      const tasks = this.taskRegistry.getTasksByLabels({
-        trackingId: trackingId,
-      });
-      // Filter the one no in loading state
-      tasks
-        .filter(t => t.state === 'loading')
-        .forEach(t => {
-          this.taskRegistry.updateTask({
-            ...t,
-            state: 'error',
-            error: String(err),
-          });
+    this.newSession(config)
+      .then(session => {
+        console.log('new session comppleted');
+        this.taskRegistry.updateTask({
+          ...task,
+          state: 'success',
+          labels: {
+            ...task.labels,
+            sessionId: session.uid,
+          },
         });
-    });
+      })
+      .catch((err: unknown) => {
+        console.log('Something went wrong while creating new session', err);
+        // Get all tasks using the tracker
+        const tasks = this.taskRegistry.getTasksByLabels({
+          trackingId: trackingId,
+        });
+        // Filter the one no in loading state
+        tasks
+          .filter(t => t.state === 'loading')
+          .forEach(t => {
+            this.taskRegistry.updateTask({
+              ...t,
+              state: 'error',
+              error: String(err),
+            });
+          });
+      });
 
     return trackingId;
   }
@@ -187,28 +186,26 @@ export class InstructlabManager implements Disposable {
 
     try {
       await Promise.allSettled(
-        (session.containers ?? []).map(container => containerEngine.stopContainer(
-            container.connection.engineId,
-            container.connection.containerId,
-          ),
+        (session.containers ?? []).map(container =>
+          containerEngine.stopContainer(container.connection.engineId, container.connection.containerId),
         ),
       );
     } catch (err: unknown) {
       console.error('Something went wrong while trying to stop all session container', err);
     } finally {
-       // restore previous state if needed
-       switch (session.state) {
-         case InstructLabState.SETUP_GENERATE:
-         case InstructLabState.GENERATING:
-           this.sessionsRegistry.setState(uid, InstructLabState.INITIALIZED);
-           break;
-         case InstructLabState.SETUP_FINE_TUNE:
-         case InstructLabState.FINE_TUNING:
-           this.sessionsRegistry.setState(uid, InstructLabState.GENERATING_COMPLETED);
-           break;
-         default:
-           break;
-       }
+      // restore previous state if needed
+      switch (session.state) {
+        case InstructLabState.SETUP_GENERATE:
+        case InstructLabState.GENERATING:
+          this.sessionsRegistry.setState(uid, InstructLabState.INITIALIZED);
+          break;
+        case InstructLabState.SETUP_FINE_TUNE:
+        case InstructLabState.FINE_TUNING:
+          this.sessionsRegistry.setState(uid, InstructLabState.GENERATING_COMPLETED);
+          break;
+        default:
+          break;
+      }
     }
   }
 
@@ -261,10 +258,10 @@ export class InstructlabManager implements Disposable {
   }
 
   protected async populateSession(session: InstructlabSession, files: string[]): Promise<void> {
-    if(!files || files.length === 0) throw new Error('cannot populate session without any files');
+    if (!files || files.length === 0) throw new Error('cannot populate session without any files');
 
     const repository = this.getSessionRepositoryDirectory(session);
-    if(session.training !== TRAINING.KNOWLEDGE) throw new Error('skills not supported yet');
+    if (session.training !== TRAINING.KNOWLEDGE) throw new Error('skills not supported yet');
 
     const miscellaneous = join(repository, 'knowledge', 'miscellaneous_unknown');
     for (let i = 0; i < files.length; i++) {
@@ -284,7 +281,7 @@ export class InstructlabManager implements Disposable {
     // get an inference server with our instruct model
     const serverTask = this.taskRegistry.createTask(`Starting an inference server`, 'loading', session.labels);
     const server: InferenceServer = await this.startInstructInferenceServer(session.connection, instructModelInfo);
-    this.taskRegistry.updateTask({...serverTask, state: 'success'});
+    this.taskRegistry.updateTask({ ...serverTask, state: 'success' });
 
     // start the generate task
     this.sessionsRegistry.setState(uid, InstructLabState.GENERATING);
@@ -292,9 +289,13 @@ export class InstructlabManager implements Disposable {
 
     try {
       await this.startGenerate(session, server);
-      this.taskRegistry.updateTask({...generateTask, state: 'success'});
+      this.taskRegistry.updateTask({ ...generateTask, state: 'success' });
     } catch (err: unknown) {
-      this.taskRegistry.updateTask({...generateTask, state: 'error', error: `Something went wrong while starting generate task: ${err}`});
+      this.taskRegistry.updateTask({
+        ...generateTask,
+        state: 'error',
+        error: `Something went wrong while starting generate task: ${err}`,
+      });
       // aborting to ensure state is not problematic
       this.abortSession(uid).catch((err: unknown) => {
         console.error('Something went wrong while trying to abort', err);
@@ -305,19 +306,19 @@ export class InstructlabManager implements Disposable {
 
   protected async getImage(session: InstructlabSession): Promise<ImageInfo> {
     let connection: ContainerProviderConnection | undefined;
-    if(session.connection) {
+    if (session.connection) {
       connection = this.podman.getContainerProviderConnection(session.connection);
     }
 
     const images = await containerEngine.listImages({
       provider: connection,
     });
-    const image = images.find(image => image.RepoTags?.some((tag) => tag === session.baseImage));
-    if(!image) throw new Error(`cannot found corresponding image to ${session.baseImage}`);
+    const image = images.find(image => image.RepoTags?.some(tag => tag === session.baseImage));
+    if (!image) throw new Error(`cannot found corresponding image to ${session.baseImage}`);
     return image;
   }
 
-  protected async startGenerate(session: InstructlabSession, server: InferenceServer): Promise<ContainerCreateResult > {
+  protected async startGenerate(session: InstructlabSession, server: InferenceServer): Promise<ContainerCreateResult> {
     const image = await this.getImage(session);
 
     const result = await containerEngine.createContainer(image.engineId, {
@@ -329,7 +330,9 @@ export class InstructlabManager implements Disposable {
         [ILAB_INFERENCE]: server.container.containerId,
       },
       Detach: true,
+      User: '0',
       HostConfig: {
+        NetworkMode: env.isLinux ? 'host' : undefined,
         SecurityOpt: [DISABLE_SELINUX_LABEL_SECURITY_OPTION],
         Mounts: [
           {
@@ -338,7 +341,7 @@ export class InstructlabManager implements Disposable {
             Type: 'bind',
           },
           {
-            Target: '/mnt/datasets',
+            Target: '/opt/app-root/src/.local/share/instructlab/datasets',
             Source: this.getSessionDatasetsDirectory(session),
             Type: 'bind',
           },
@@ -347,12 +350,13 @@ export class InstructlabManager implements Disposable {
             Source: this.getSessionConfigurationPath(session),
             Type: 'bind',
             ReadOnly: true,
-          }],
+          },
+        ],
       },
       Cmd: [
         'generate',
         // use the endpoint of our inference server
-        `--endpoint-url=http://host.containers.internal:${server.connection.port}/v1`,
+        `--endpoint-url=http://${env.isLinux ? 'localhost' : 'host.containers.internal'}:${server.connection.port}/v1`,
         // taxonomy path should be the mounted taxonomy path
         '--taxonomy-path=/mnt/taxonomy',
         // output dir should be the mounted dataset path
@@ -372,7 +376,10 @@ export class InstructlabManager implements Disposable {
 
   public async requestTrain(uid: string): Promise<void> {
     const session = this.sessionsRegistry.get(uid);
-    if(session.state !== InstructLabState.GENERATING_COMPLETED) throw new Error(`cannot start training on invalid state: expected ${InstructLabState.GENERATING_COMPLETED} got ${session.state}`);
+    if (session.state !== InstructLabState.GENERATING_COMPLETED)
+      throw new Error(
+        `cannot start training on invalid state: expected ${InstructLabState.GENERATING_COMPLETED} got ${session.state}`,
+      );
 
     // setup fine tuning
     this.sessionsRegistry.setState(uid, InstructLabState.SETUP_FINE_TUNE);
@@ -383,9 +390,13 @@ export class InstructlabManager implements Disposable {
 
     try {
       await this.startTrain(session);
-      this.taskRegistry.updateTask({...trainTask, state: 'success'});
+      this.taskRegistry.updateTask({ ...trainTask, state: 'success' });
     } catch (err: unknown) {
-      this.taskRegistry.updateTask({...trainTask, state: 'error', error: `Something went wrong while starting train task: ${err}`});
+      this.taskRegistry.updateTask({
+        ...trainTask,
+        state: 'error',
+        error: `Something went wrong while starting train task: ${err}`,
+      });
       // aborting to ensure state is not problematic
       this.abortSession(uid).catch((err: unknown) => {
         console.error('Something went wrong while trying to abort', err);
@@ -404,6 +415,7 @@ export class InstructlabManager implements Disposable {
         ...session.labels,
         [ILAB_LABEL]: 'train',
       },
+      User: '0',
       Detach: true,
       HostConfig: {
         SecurityOpt: [DISABLE_SELINUX_LABEL_SECURITY_OPTION],
@@ -423,7 +435,8 @@ export class InstructlabManager implements Disposable {
             Source: this.getSessionConfigurationPath(session),
             Type: 'bind',
             ReadOnly: true,
-          }],
+          },
+        ],
       },
       Cmd: [
         'train',
@@ -451,19 +464,20 @@ export class InstructlabManager implements Disposable {
    * @param model
    * @protected
    */
-  protected async startInstructInferenceServer(connection: ContainerProviderConnectionInfo | undefined, model: ModelInfo): Promise<InferenceServer> {
+  protected async startInstructInferenceServer(
+    connection: ContainerProviderConnectionInfo | undefined,
+    model: ModelInfo,
+  ): Promise<InferenceServer> {
     let engineId: string | undefined;
-    if(connection) {
-      engineId = await this.podman.getEngineId(
-        this.podman.getContainerProviderConnection(connection),
-      );
+    if (connection) {
+      engineId = await this.podman.getEngineId(this.podman.getContainerProviderConnection(connection));
     }
 
     let server: InferenceServer | undefined = this.inferenceManager.findServerByModel(model, engineId);
     // if an existing server exists using it
-    if(server) {
+    if (server) {
       // if stopped start it
-      if(server.status === 'stopped') {
+      if (server.status === 'stopped') {
         await this.inferenceManager.startInferenceServer(server.container.containerId);
       }
 
@@ -477,7 +491,7 @@ export class InstructlabManager implements Disposable {
     });
     const serverId = await this.inferenceManager.createInferenceServer(config);
     server = this.inferenceManager.get(serverId);
-    if(!server) throw new Error(`Something went wrong while trying to get inference server with id ${serverId}`);
+    if (!server) throw new Error(`Something went wrong while trying to get inference server with id ${serverId}`);
     return server;
   }
 }

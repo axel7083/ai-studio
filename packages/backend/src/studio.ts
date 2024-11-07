@@ -278,10 +278,7 @@ export class Studio {
     this.#inferenceManager.init();
     this.#extensionContext.subscriptions.push(this.#inferenceManager);
 
-    this.#instructLabSessionRegistry = new InstructLabRegistry(
-      this.#panel.webview,
-      appUserDirectory,
-    );
+    this.#instructLabSessionRegistry = new InstructLabRegistry(this.#panel.webview, appUserDirectory);
     this.#instructLabSessionRegistry.init();
     this.#extensionContext.subscriptions.push(this.#instructLabSessionRegistry);
 

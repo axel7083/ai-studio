@@ -15,24 +15,21 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import type {
-  Disposable,
-} from '@podman-desktop/api';
+import type { Disposable } from '@podman-desktop/api';
 import type { InferenceServerConfig } from '@shared/src/models/InferenceServerConfig';
 import type { IWorker } from '../IWorker';
 import type { TaskRegistry } from '../../registries/TaskRegistry';
 import type { InferenceServer, InferenceType } from '@shared/src/models/IInference';
 import { ContainerProvider } from './ContainerProvider';
 
-export abstract class InferenceProvider extends ContainerProvider implements IWorker<InferenceServerConfig, InferenceServer>, Disposable {
+export abstract class InferenceProvider
+  extends ContainerProvider
+  implements IWorker<InferenceServerConfig, InferenceServer>, Disposable
+{
   readonly type: InferenceType;
   readonly name: string;
 
-  protected constructor(
-    taskRegistry: TaskRegistry,
-    type: InferenceType,
-    name: string,
-  ) {
+  protected constructor(taskRegistry: TaskRegistry, type: InferenceType, name: string) {
     super(taskRegistry);
     this.type = type;
     this.name = name;

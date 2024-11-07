@@ -31,5 +31,3 @@ function getStatus(): string {
 {:else}
   <StatusIcon status={status} icon={ModelWhite} />
 {/if}
-
-

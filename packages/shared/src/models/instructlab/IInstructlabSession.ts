@@ -37,7 +37,7 @@ export interface InstructlabContainer {
   connection: {
     engineId: string;
     containerId: string;
-  }
+  };
 }
 
 export interface InstructlabSession {
@@ -63,7 +63,7 @@ export interface InstructlabSession {
   // timestamp
   createdTime: number;
 
-  training: TRAINING,
+  training: TRAINING;
 
   state: InstructLabState;
   /**
@@ -86,7 +86,7 @@ export interface InstructLabSessionConfig {
   repository?: string;
 
   name: string;
-  training: TRAINING,
+  training: TRAINING;
   files: string[];
   /**
    * Model that will be used to generate the synthetic data
@@ -103,7 +103,6 @@ export interface InstructLabSessionConfig {
 }
 
 export interface InstructLabSessions {
-  version: '1.0',
+  version: '1.0';
   sessions: InstructlabSession[];
 }
-

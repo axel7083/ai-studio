@@ -25,7 +25,8 @@ import { env, Uri } from '@podman-desktop/api';
 export class InstructlabApiImpl implements InstructlabAPI {
   constructor(
     private instructlabManager: InstructlabManager,
-    private instructLabSessions: InstructLabRegistry) {}
+    private instructLabSessions: InstructLabRegistry,
+  ) {}
 
   async getIsntructlabSessions(): Promise<InstructlabSession[]> {
     return this.instructLabSessions.getSessions();
@@ -42,9 +43,7 @@ export class InstructlabApiImpl implements InstructlabAPI {
   async openSessionDirectory(uid: string): Promise<boolean> {
     const session = this.instructLabSessions.get(uid);
 
-    return env.openExternal(Uri.file(
-      this.instructlabManager.getSessionDirectory(session),
-    ));
+    return env.openExternal(Uri.file(this.instructlabManager.getSessionDirectory(session)));
   }
 
   async abortSession(uid: string): Promise<void> {

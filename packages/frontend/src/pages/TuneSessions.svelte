@@ -1,6 +1,15 @@
 <script lang="ts">
 import { faGaugeHigh, faPlusCircle } from '@fortawesome/free-solid-svg-icons';
-import { Button, EmptyScreen, NavPage, Tab, Table, TableColumn, TableRow, TableDurationColumn } from '@podman-desktop/ui-svelte';
+import {
+  Button,
+  EmptyScreen,
+  NavPage,
+  Tab,
+  Table,
+  TableColumn,
+  TableRow,
+  TableDurationColumn,
+} from '@podman-desktop/ui-svelte';
 import { onMount } from 'svelte';
 import { instructlabSessions } from '../stores/instructlabSessions';
 import { type InstructlabSession, InstructLabState } from '@shared/src/models/instructlab/IInstructlabSession';
@@ -25,7 +34,11 @@ const columns = [
   // session name
   new TableColumn<InstructlabSession>('Name', { width: '100px', renderer: InstructlabColumnName, align: 'left' }),
   // target model
-  new TableColumn<InstructlabSession>('Teacher Model', { width: '1fr', renderer: InstructlabColumnModelName, align: 'left' }),
+  new TableColumn<InstructlabSession>('Teacher Model', {
+    width: '1fr',
+    renderer: InstructlabColumnModelName,
+    align: 'left',
+  }),
   // repository used
   new TableColumn<InstructlabSession>('Repository', {
     width: '1fr',

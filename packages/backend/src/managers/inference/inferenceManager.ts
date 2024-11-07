@@ -93,7 +93,7 @@ export class InferenceManager extends Publisher<InferenceServer[]> implements Di
    */
   public getServers(engineId?: string): InferenceServer[] {
     const values = Array.from(this.#servers.values());
-    return engineId?values.filter(value => value.container.engineId === engineId):values;
+    return engineId ? values.filter(value => value.container.engineId === engineId) : values;
   }
 
   /**

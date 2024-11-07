@@ -52,11 +52,11 @@ export class InstructLabRegistry extends Publisher<InstructlabSession[]> impleme
 
   public get(uid: string): InstructlabSession {
     const session = this.#sessions.get(uid);
-    if(!session) throw new Error(`unknown session uid ${uid}`);
+    if (!session) throw new Error(`unknown session uid ${uid}`);
     return session;
   }
 
-  public setState(uid: string, state: InstructLabState, notify: boolean = true): void {
+  public setState(uid: string, state: InstructLabState): void {
     const session = this.get(uid);
     this.#sessions.set(session.uid, {
       ...session,
@@ -76,7 +76,7 @@ export class InstructLabRegistry extends Publisher<InstructlabSession[]> impleme
   public registerContainer(uid: string, container: InstructlabContainer): void {
     const session = this.get(uid);
     const containers = (session.containers ?? []).filter(
-      mContainer => container.connection.containerId === mContainer.connection.containerId
+      mContainer => container.connection.containerId === mContainer.connection.containerId,
     );
 
     this.#sessions.set(session.uid, {
@@ -109,10 +109,13 @@ export class InstructLabRegistry extends Publisher<InstructlabSession[]> impleme
     const sessionsFile = this.getInstructLabSessionsFile();
 
     // save the sessions
-    return writeFile(sessionsFile, JSON.stringify({
-      version: '1.0',
-      sessions: this.getSessions(),
-    } as InstructLabSessions));
+    return writeFile(
+      sessionsFile,
+      JSON.stringify({
+        version: '1.0',
+        sessions: this.getSessions(),
+      } as InstructLabSessions),
+    );
   }
 
   protected async initInstructLabDirectory(): Promise<void> {
@@ -143,34 +146,47 @@ export class InstructLabRegistry extends Publisher<InstructlabSession[]> impleme
 
     const rawContent: string = await readFile(sessionsFile, 'utf-8');
     const parsed = JSON.parse(rawContent);
-    if(!parsed || typeof parsed !== 'object') throw new Error(`invalid ${sessionsFile}`);
-    if(!('version' in parsed)) throw new Error(`missing version in ${sessionsFile}`);
-    if(parsed.version !== '1.0') throw new Error(`invalid version in ${sessionsFile} expected 1.0 got ${parsed.version}`);
+    if (!parsed || typeof parsed !== 'object') throw new Error(`invalid ${sessionsFile}`);
+    if (!('version' in parsed)) throw new Error(`missing version in ${sessionsFile}`);
+    if (parsed.version !== '1.0')
+      throw new Error(`invalid version in ${sessionsFile} expected 1.0 got ${parsed.version}`);
 
-    if(!('sessions' in parsed)) throw new Error(`missing sessions in ${sessionsFile}`);
-    if(!Array.isArray(parsed.sessions)) throw new Error(`sessions not an array in ${sessionsFile}`);
+    if (!('sessions' in parsed)) throw new Error(`missing sessions in ${sessionsFile}`);
+    if (!Array.isArray(parsed.sessions)) throw new Error(`sessions not an array in ${sessionsFile}`);
     for (const session of parsed.sessions) {
-      if(!session || typeof session !== 'object') throw new Error(`invalid ${session}`);
-      if(!('uid' in session) || typeof session.uid !== 'string') throw new Error(`invalid uid for session in ${sessionsFile}`);
-      if(!('baseImage' in session) || typeof session.baseImage !== 'string') throw new Error(`invalid baseImage for session ${session.uid}`);
-      if(!('name' in session) || typeof session.name !== 'string' && !isNameValid(session.name)) throw new Error(`invalid name for session ${session.uid}`);
-      if(!('teacherModelId' in session) || typeof session.teacherModelId !== 'string') throw new Error(`invalid teacherModelId for session ${session.uid}`);
-      if(!('targetModel' in session) || typeof session.targetModel !== 'string') throw new Error(`invalid targetModel for session ${session.uid}`);
-      if(!('repository' in session) || typeof session.repository !== 'string') throw new Error(`invalid repository for session ${session.uid}`);
-      if(!('createdTime' in session) || typeof session.createdTime !== 'number') throw new Error(`invalid createdTime for session ${session.uid}`);
-      if(!('training' in session) || typeof session.training !== 'string') throw new Error(`invalid training for session ${session.uid}`);
-      if(!('state' in session) || typeof session.state !== 'string') throw new Error(`invalid state for session ${session.uid}`);
+      if (!session || typeof session !== 'object') throw new Error(`invalid ${session}`);
+      if (!('uid' in session) || typeof session.uid !== 'string')
+        throw new Error(`invalid uid for session in ${sessionsFile}`);
+      if (!('baseImage' in session) || typeof session.baseImage !== 'string')
+        throw new Error(`invalid baseImage for session ${session.uid}`);
+      if (!('name' in session) || (typeof session.name !== 'string' && !isNameValid(session.name)))
+        throw new Error(`invalid name for session ${session.uid}`);
+      if (!('teacherModelId' in session) || typeof session.teacherModelId !== 'string')
+        throw new Error(`invalid teacherModelId for session ${session.uid}`);
+      if (!('targetModel' in session) || typeof session.targetModel !== 'string')
+        throw new Error(`invalid targetModel for session ${session.uid}`);
+      if (!('repository' in session) || typeof session.repository !== 'string')
+        throw new Error(`invalid repository for session ${session.uid}`);
+      if (!('createdTime' in session) || typeof session.createdTime !== 'number')
+        throw new Error(`invalid createdTime for session ${session.uid}`);
+      if (!('training' in session) || typeof session.training !== 'string')
+        throw new Error(`invalid training for session ${session.uid}`);
+      if (!('state' in session) || typeof session.state !== 'string')
+        throw new Error(`invalid state for session ${session.uid}`);
       // validate labels
-      if(!('labels' in session) || typeof session.labels !== 'object')  throw new Error(`invalid labels for session ${session.uid}`);
-      if(
-        Array.from(Object.values(session.labels)).some((value) => typeof value !== 'string')
-      ) throw new Error(`invalid labels for session in ${session.uid}`);
+      if (!('labels' in session) || typeof session.labels !== 'object')
+        throw new Error(`invalid labels for session ${session.uid}`);
+      if (Array.from(Object.values(session.labels)).some(value => typeof value !== 'string'))
+        throw new Error(`invalid labels for session in ${session.uid}`);
 
       // validate connection if exists
-      if(('connection' in session)) {
-        if(!session.connection || typeof session.connection !== 'object') throw new Error(`invalid connection ${session.uid}`);
-        if(!('providerId' in session.connection) || typeof session.connection.providerId !== 'string') throw new Error(`invalid providerId for connection in session ${session.uid}`);
-        if(!('name' in session.connection) || typeof session.connection.name !== 'string') throw new Error(`invalid name for connection in session ${session.uid}`);
+      if ('connection' in session) {
+        if (!session.connection || typeof session.connection !== 'object')
+          throw new Error(`invalid connection ${session.uid}`);
+        if (!('providerId' in session.connection) || typeof session.connection.providerId !== 'string')
+          throw new Error(`invalid providerId for connection in session ${session.uid}`);
+        if (!('name' in session.connection) || typeof session.connection.name !== 'string')
+          throw new Error(`invalid name for connection in session ${session.uid}`);
       }
 
       this.#sessions.set(session.uid, session);

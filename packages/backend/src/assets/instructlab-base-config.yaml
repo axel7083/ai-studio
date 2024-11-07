@@ -1,6 +1,6 @@
 version: 1.0.0
 generate:
-  taxonomy_path: /mnt/taxonomy
+  pipeline: simple
 train:
   ckpt_output_dir: /mnt/checkpoints
 general:

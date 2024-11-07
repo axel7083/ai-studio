@@ -15,24 +15,15 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { isNameValid } from './instructlab';
 
 describe('isNameValid', () => {
-  test.each([
-    'hello-world',
-    'hello',
-    'helloworld',
-  ])('%s should be valid', (value: string) => {
+  test.each(['hello-world', 'hello', 'helloworld'])('%s should be valid', (value: string) => {
     expect(isNameValid(value)).toBeTruthy();
   });
 
-  test.each([
-    'hello/world',
-    'hello world',
-    'hello_world',
-    'helloWorld',
-  ])('%s should not be valid', (value: string) => {
+  test.each(['hello/world', 'hello world', 'hello_world', 'helloWorld'])('%s should not be valid', (value: string) => {
     expect(isNameValid(value)).toBeFalsy();
   });
 });

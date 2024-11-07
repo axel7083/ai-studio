@@ -115,13 +115,14 @@ const processTasks = (trackedTasks: Task[]): void => {
 };
 
 async function submit(): Promise<void> {
-  if(!teacherModel || !sessionName) return;
+  if (!teacherModel || !sessionName) return;
   // take snapshot
   const mModel = $state.snapshot(teacherModel);
 
   try {
     const trackingId = await instructlabClient.requestNewSession({
-      files: $state.snapshot(trainingType) === 'skills' ? $state.snapshot(skillsFiles) : $state.snapshot(knowledgeFiles),
+      files:
+        $state.snapshot(trainingType) === 'skills' ? $state.snapshot(skillsFiles) : $state.snapshot(knowledgeFiles),
       labels: {},
       name: $state.snapshot(sessionName),
       targetModel: $state.snapshot(targetModel),
@@ -149,7 +150,6 @@ async function submit(): Promise<void> {
   </svelte:fragment>
   <svelte:fragment slot="content">
     <div class="flex flex-col w-full">
-
       <!-- tasks tracked -->
       <TrackedTasks onChange={processTasks} class="mx-5 mt-5" trackingId={trackingId} tasks={$tasks} />
 
@@ -166,11 +166,10 @@ async function submit(): Promise<void> {
           <!-- target model -->
           <div>
             <label for="target-model-name" class="pt-4 block mb-2 font-bold text-[var(--pd-content-card-header-text)]"
-            >Target model</label>
+              >Target model</label>
             <Input bind:value={targetModel} class="grow" name="target-model-name" aria-label="target model name" />
 
-            <span class="text-[var(--pd-table-body-text)]"
-            >Target model must be a hugging face repository</span>
+            <span class="text-[var(--pd-table-body-text)]">Target model must be a hugging face repository</span>
           </div>
 
           <!-- session name -->

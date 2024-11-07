@@ -16,11 +16,13 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import {
+import type {
   ContainerCreateOptions,
   ContainerCreateResult,
   containerEngine,
-  type ContainerProviderConnection, type ImageInfo, type PullEvent,
+  type ContainerProviderConnection,
+  type ImageInfo,
+  type PullEvent,
 } from '@podman-desktop/api';
 import { getImageInfo } from '../../utils/inferenceUtils';
 import type { TaskRegistry } from '../../registries/TaskRegistry';
@@ -28,7 +30,6 @@ import type { TaskRegistry } from '../../registries/TaskRegistry';
 export type BetterContainerCreateResult = ContainerCreateResult & { engineId: string };
 
 export abstract class ContainerProvider {
-
   protected constructor(private taskRegistry: TaskRegistry) {}
 
   protected async createContainer(
