@@ -312,7 +312,7 @@
       "url": "https://huggingface.co/bartowski/granite-3.1-8b-instruct-GGUF/resolve/main/granite-3.1-8b-instruct-Q4_K_M.gguf",
       "memory": 4939212390,
       "properties": {
-        "chatFormat": "openchat"
+        "jinja": "true"
       },
       "sha256": "b72cfca8e30f23af77f922ce18d6fe1a5d4925907dddf7249c0cabc2739d48c8",
       "backend": "llama-cpp"
